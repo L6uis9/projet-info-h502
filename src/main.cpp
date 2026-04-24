@@ -109,6 +109,7 @@ int main()
     // Shaders
     Shader modelShader ("shaders/model.vert",  "shaders/model.frag");
     Shader skyboxShader("shaders/skybox.vert", "shaders/skybox.frag");
+    Shader starShader  ("shaders/star.vert",   "shaders/star.frag");
 
     // Skybox
     // px=right, nx=left, py=top, ny=bottom, pz=front, nz=back
@@ -162,12 +163,39 @@ int main()
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
+    // All stars: single source of truth for both lighting and visual rendering
+    struct VisualStar { glm::vec3 dir; glm::vec3 color; float radius; };
+    const std::vector<VisualStar> visualStars = {
+        { glm::normalize(glm::vec3( 4000.f,  1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f }, // main sun
+        { glm::normalize(glm::vec3(-3000.f,   800.f, -1500.f)), glm::vec3(1.00f, 0.85f, 0.15f), 0.07f }, // yellow star
+        { glm::normalize(glm::vec3(-2000.f,   600.f,  3000.f)), glm::vec3(0.35f, 0.65f, 1.00f), 0.06f }, // blue star
+    };
+
     // Pre-configure model shader
     modelShader.use();
-    modelShader.setInt  ("diffuseMap",    0);
-    modelShader.setVec3 ("lightDir",      glm::normalize(glm::vec3(-0.3f, -1.f, -0.5f)));
-    modelShader.setVec3 ("lightColor",    {1.f,  1.f,  1.f });
-    modelShader.setVec3 ("ambientColor",  {0.15f,0.15f,0.15f});
+    modelShader.setInt ("diffuseMap",   0);
+    modelShader.setVec3("ambientColor", {0.04f, 0.04f, 0.07f});
+    modelShader.setInt ("numStars",     (int)visualStars.size());
+    for (int i = 0; i < (int)visualStars.size(); i++) {
+        modelShader.setVec3("starDirs["   + std::to_string(i) + "]", visualStars[i].dir);
+        modelShader.setVec3("starColors[" + std::to_string(i) + "]", visualStars[i].color);
+    }
+
+    // Sun billboard quad
+    const float sunQuad[] = { -0.5f,-0.5f,  0.5f,-0.5f,  0.5f, 0.5f,  -0.5f, 0.5f };
+    const unsigned int sunIdx[] = { 0,1,2, 0,2,3 };
+    GLuint sunVAO, sunVBO, sunEBO;
+    glGenVertexArrays(1, &sunVAO);
+    glGenBuffers(1, &sunVBO);
+    glGenBuffers(1, &sunEBO);
+    glBindVertexArray(sunVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(sunQuad), sunQuad, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(sunIdx), sunIdx, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glBindVertexArray(0);
 
     // Game loop
     while (!glfwWindowShouldClose(window))
@@ -251,10 +279,28 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
         skybox.draw();
 
+        // Draw stars (billboards at "infinity")
+        glDepthFunc(GL_LEQUAL);
+        starShader.use();
+        starShader.setMat4("view",       view);
+        starShader.setMat4("projection", projection);
+        glBindVertexArray(sunVAO);
+        for (auto& vs : visualStars) {
+            starShader.setVec3 ("sunDir",    vs.dir);
+            starShader.setFloat("sunRadius", vs.radius);
+            starShader.setVec3 ("starColor", vs.color);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
+
         glfwSwapBuffers(window);
     }
 
     // Cleanup
+    glDeleteVertexArrays(1, &sunVAO);
+    glDeleteBuffers(1, &sunVBO);
+    glDeleteBuffers(1, &sunEBO);
     spaceship.free();
     skybox.free();
     glfwTerminate();
