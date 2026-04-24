@@ -86,16 +86,17 @@ parseMTL(const std::string& mtlPath, const std::string& texDir)
         } else if (cur && token == "Kd") {
             ss >> cur->Kd.r >> cur->Kd.g >> cur->Kd.b;
         } else if (cur && token == "map_Kd") {
-            // The .mtl may reference "textures/Foo.jpg" – we strip to basename
-            // and look in texDir so the project layout is self-contained.
-            std::string rawPath; ss >> rawPath;
-            // Handle Windows backslashes
+            // Read the rest of the line to handle filenames with spaces
+            std::string rawPath;
+            std::getline(ss, rawPath);
+            size_t start = rawPath.find_first_not_of(" \t");
+            if (start != std::string::npos) rawPath = rawPath.substr(start);
+            // Normalize Windows backslashes
             for (char& c : rawPath) if (c == '\\') c = '/';
-            fs::path p(rawPath);
-            std::string filename = p.filename().string();
+            std::string filename = fs::path(rawPath).filename().string();
             std::string fullPath = texDir + "/" + filename;
             cur->diffuseTexture = loadTexture(fullPath);
-            cur->hasDiffuse     = true;
+            cur->hasDiffuse     = (cur->diffuseTexture != 0);
         }
     }
     return mats;
