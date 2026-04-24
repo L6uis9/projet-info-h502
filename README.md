@@ -3,8 +3,6 @@
 Jeu de vaisseau spatial en OpenGL où le joueur doit éviter des astéroïdes dans l'espace.  
 Projet réalisé dans le cadre du cours **INFO-H-502 – 3D Graphics** (ULB, 2025-2026).
 
----
-
 ## Auteur
 
 DUMAN Louis-David
@@ -32,8 +30,6 @@ cd build
 ./SpaceGame
 ```
 
----
-
 ## Contrôles
 
 | Touche | Action |
@@ -47,15 +43,6 @@ cd build
 
 ### Basiques (obligatoires)
 
-- **Lumières** — modèle de Phong (ambiante, diffuse, spéculaire) dans `basic.frag`
-- **Textures** — textures diffuse et spéculaire sur le vaisseau et les astéroïdes (`stb_image`)
-- **Plusieurs modèles** — vaisseau (`spaceship.obj`) et astéroïde (`asteroid.obj`) chargés via `tinyobjloader`
-- **Cubemap** — skybox spatiale avec `GL_TEXTURE_CUBE_MAP` (`Skybox.cpp`)
-- **Game logic** — score, vies, états de jeu (menu / jeu / game over)
-- **Déplacement** — vaisseau déplaçable dans les 6 directions avec accélération
-- **Caméra libre** — navigation free-fly à la souris (`Camera.cpp`)
-- **Réflexion / réfraction** — effet de bouclier sur le vaisseau via `reflect.frag` + env map
-
 ### Intermédiaires
 
 ### Avancées
@@ -66,7 +53,4 @@ Chapitre choisi : **Chapitre 16**
 
 ## Structure du projet
 
-
 ## Vidéo de démonstration
-
-[Lien à compléter]
