@@ -35,6 +35,7 @@ cd build
 | Touche | Action |
 |---|---|
 | `Z / W` | Avancer |
+| `S` | Regarder en arrière |
 | `Souris` | Orienter le vaisseau |
 | `Échap` | Quitter |
 ---

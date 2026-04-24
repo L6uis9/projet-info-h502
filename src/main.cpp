@@ -28,6 +28,7 @@ static float      lastY      = SCR_H / 2.f;
 static bool       firstMouse = true;
 static float      deltaTime  = 0.f;
 static float      lastFrame  = 0.f;
+static bool       lookBack   = false;
 
 // GLFW callbacks
 
@@ -71,8 +72,11 @@ static void processInput(GLFWwindow* win)
     if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(win, GLFW_KEY_Z) == GLFW_PRESS)
         shipPos += shipSpeed * deltaTime * fwd;
 
+    lookBack = (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS);
+
     float dist = 8.f;
-    camera.position = shipPos - fwd * dist + glm::vec3(0.f, 1.5f, 0.f);
+    float side  = lookBack ? 1.f : -1.f;
+    camera.position = shipPos + fwd * dist * side + glm::vec3(0.f, 1.5f, 0.f);
 }
 
 int main()
