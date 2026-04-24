@@ -39,12 +39,7 @@ cd build
 | Touche | Action |
 |---|---|
 | `Z / W` | Avancer |
-| `S` | Reculer |
-| `Q / A` | Déplacer à gauche |
-| `D` | Déplacer à droite |
-| `Espace` | Monter |
-| `Shift` | Descendre |
-| `Souris` | Orienter la caméra |
+| `Souris` | Orienter le vaisseau |
 | `Échap` | Quitter |
 ---
 

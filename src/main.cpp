@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 
@@ -19,12 +20,14 @@ static const int   SCR_H  = 720;
 static const char* TITLE  = "Space Game";
 
 // Globals
-static Camera camera;
-static float  lastX      = SCR_W / 2.f;
-static float  lastY      = SCR_H / 2.f;
-static bool   firstMouse = true;
-static float  deltaTime  = 0.f;
-static float  lastFrame  = 0.f;
+static Camera     camera;
+static glm::vec3  shipPos    = {0.f, 0.f, 0.f};
+static float      shipSpeed  = 10.f;
+static float      lastX      = SCR_W / 2.f;
+static float      lastY      = SCR_H / 2.f;
+static bool       firstMouse = true;
+static float      deltaTime  = 0.f;
+static float      lastFrame  = 0.f;
 
 // GLFW callbacks
 
@@ -60,16 +63,16 @@ static void key_cb(GLFWwindow* win, int key, int, int action, int)
         glfwSetWindowShouldClose(win, true);
 }
 
-// Continuous key handling
+// Continuous key handling – moves the spaceship, then snaps camera behind it
 static void processInput(GLFWwindow* win)
 {
-    const int keys[] = {
-        GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_A, GLFW_KEY_D,
-        GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT
-    };
-    for (int k : keys)
-        if (glfwGetKey(win, k) == GLFW_PRESS)
-            camera.processKeyboard(k, deltaTime);
+    glm::vec3 fwd = camera.front;
+
+    if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(win, GLFW_KEY_Z) == GLFW_PRESS)
+        shipPos += shipSpeed * deltaTime * fwd;
+
+    float dist = 8.f;
+    camera.position = shipPos - fwd * dist + glm::vec3(0.f, 1.5f, 0.f);
 }
 
 int main()
@@ -187,17 +190,21 @@ int main()
         glfwGetFramebufferSize(window, &vpW, &vpH);
         float aspect = vpH > 0 ? (float)vpW / (float)vpH : 1.f;
 
-        glm::mat4 view       = camera.viewMatrix();
+        // Always look at the ship so it stays centered on screen
+        glm::mat4 view       = glm::lookAt(camera.position,
+                                           shipPos + glm::vec3(0.f, 0.5f, 0.f),
+                                           glm::vec3(0.f, 1.f, 0.f));
         glm::mat4 projection = camera.projMatrix(aspect);
 
         // Draw spaceship
         modelShader.use();
 
         glm::mat4 model = glm::mat4(1.f);
-        // scale Blender OBJ
-        model = glm::scale(model, glm::vec3(0.5f));
-        // Rotate so +Z faces "forward" in our scene
-        model = glm::rotate(model, glm::radians(-90.f), glm::vec3(0,1,0));
+        model = glm::translate(model, shipPos);
+        model = glm::rotate(model, glm::radians(-camera.yaw),   glm::vec3(0.f, 1.f, 0.f));
+        model = glm::rotate(model, glm::radians(-90.f),         glm::vec3(0.f, 1.f, 0.f));  // fix model orientation
+        model = glm::rotate(model, glm::radians(camera.pitch),  glm::vec3(1.f, 0.f, 0.f));  // pitch from mouse
+        model = glm::scale(model, glm::vec3(0.75f));
 
         modelShader.setMat4("model",      model);
         modelShader.setMat4("view",       view);
