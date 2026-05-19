@@ -3,11 +3,14 @@
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoord;
+in vec3 LocalPos;
+in vec3 LocalNormal;
 
 out vec4 FragColor;
 
 uniform sampler2D diffuseMap;
 uniform bool      hasDiffuse;
+uniform bool      useTriplanar;
 uniform vec3      matKd;
 
 #define MAX_STARS 4
@@ -20,7 +23,21 @@ uniform vec3 viewPos;
 
 void main()
 {
-    vec3 baseColor = hasDiffuse ? texture(diffuseMap, TexCoord).rgb : matKd;
+    vec3 baseColor;
+    if (hasDiffuse && useTriplanar) {
+        // Triplanar mapping: sample from 3 orthogonal planes and blend by normal
+        // Uses object-space position/normal so texture sticks to the asteroid as it rotates
+        vec3 w = abs(normalize(LocalNormal));
+        w = pow(w, vec3(4.0));          // sharpen blend at axis-aligned faces
+        w /= w.x + w.y + w.z;
+        const float scale = 0.5;
+        vec3 tx = texture(diffuseMap, LocalPos.yz * scale).rgb;
+        vec3 ty = texture(diffuseMap, LocalPos.xz * scale).rgb;
+        vec3 tz = texture(diffuseMap, LocalPos.xy * scale).rgb;
+        baseColor = tx * w.x + ty * w.y + tz * w.z;
+    } else {
+        baseColor = hasDiffuse ? texture(diffuseMap, TexCoord).rgb : matKd;
+    }
     vec3 norm      = normalize(Normal);
     vec3 viewDir   = normalize(viewPos - FragPos);
 

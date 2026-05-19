@@ -455,6 +455,7 @@ int main()
 
         // Draw spaceship
         modelShader.use();
+        modelShader.setBool("useTriplanar", false);
 
         glm::mat4 model = glm::mat4(1.f);
         model = glm::translate(model, shipPos);
@@ -480,6 +481,7 @@ int main()
         }
 
         // Draw asteroids
+        modelShader.setBool("useTriplanar", true);
         for (auto& inst : asteroids) {
             glm::mat4 am = glm::mat4(1.f);
             am = glm::translate(am, inst.position);
