@@ -22,17 +22,17 @@ static const int   SCR_H  = 720;
 static const char* TITLE  = "Space Game";
 
 // Asteroid system settings
-static const int   ASTEROID_MESH_POOL      = 15;    // distinct pre-generated shapes
-static const float ASTEROID_MIN_SPAWN_RADIUS = 40.f;  // minimum spawn distance from ship
-static const float ASTEROID_SPAWN_RADIUS     = 100.f; // maximum spawn distance from ship
+static const int   ASTEROID_MESH_POOL      = 25;    // distinct pre-generated shapes
+static const float ASTEROID_MIN_SPAWN_RADIUS = 100.f;  // minimum spawn distance from ship
+static const float ASTEROID_SPAWN_RADIUS     = 200.f; // maximum spawn distance from ship
 static const float ASTEROID_DESPAWN_DIST   = 170.f; // remove when farther than this from ship
-static const float ASTEROID_MIN_SCALE      = 0.8f;
+static const float ASTEROID_MIN_SCALE      = 0.1f;
 static const float ASTEROID_MAX_SCALE      = 4.5f;
-static const float ASTEROID_MIN_SPEED      = 8.f;
-static const float ASTEROID_MAX_SPEED      = 20.f;
-static const float ASTEROID_SPAWN_INTERVAL = 0.4f;  // seconds between spawns
-static const int   ASTEROID_MAX_COUNT      = 80;
-static const float ASTEROID_TOWARD_SHIP_PROBA = 0.1f;
+static const float ASTEROID_MIN_SPEED      = 15.f;
+static const float ASTEROID_MAX_SPEED      = 25.f;
+static const float ASTEROID_SPAWN_INTERVAL = 0.01f;  // seconds between spawns
+static const int   ASTEROID_MAX_COUNT      = 200;
+static const float ASTEROID_TOWARD_SHIP_PROBA = 0.2f;
 
 // Globals
 static Camera     camera;
