@@ -124,11 +124,13 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     // Shaders
-    Shader modelShader ("shaders/model.vert",  "shaders/model.frag");
-    Shader skyboxShader("shaders/skybox.vert", "shaders/skybox.frag");
-    Shader starShader  ("shaders/star.vert",   "shaders/star.frag");
+    Shader modelShader   ("shaders/model.vert",    "shaders/model.frag");
+    Shader skyboxShader  ("shaders/skybox.vert",   "shaders/skybox.frag");
+    Shader starShader    ("shaders/star.vert",     "shaders/star.frag");
+    Shader particleShader("shaders/particle.vert", "shaders/particle.frag");
 
     // Skybox
     // px=right, nx=left, py=top, ny=bottom, pz=front, nz=back
@@ -241,6 +243,37 @@ int main()
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glBindVertexArray(0);
 
+    // Fire trail particle system
+    struct Particle {
+        glm::vec3 pos;
+        glm::vec3 vel;
+        float     life;     // remaining seconds
+        float     maxLife;
+        float     size;
+    };
+
+    static const int   MAX_PT    = 200;
+    static const float PT_RATE   = 100.f; // particles per second
+
+    std::vector<Particle> particles;
+    particles.reserve(MAX_PT);
+    float ptSpawnAccum = 0.f;
+
+    // GPU buffer layout: [vec3 pos | vec4 color | float size] = 8 floats
+    GLuint ptVAO, ptVBO;
+    glGenVertexArrays(1, &ptVAO);
+    glGenBuffers(1, &ptVBO);
+    glBindVertexArray(ptVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
+    glBufferData(GL_ARRAY_BUFFER, MAX_PT * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(7 * sizeof(float)));
+    glBindVertexArray(0);
+
     // Game loop
     while (!glfwWindowShouldClose(window))
     {
@@ -253,6 +286,43 @@ int main()
         glfwPollEvents();
         processInput(window);
 
+        // Fire trail: spawn particles when thrusting
+        bool thrusting = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
+                         glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
+        if (thrusting) {
+            ptSpawnAccum += PT_RATE * deltaTime;
+            int toSpawn = (int)ptSpawnAccum;
+            ptSpawnAccum -= (float)toSpawn;
+
+            glm::vec3 back  = -camera.front;
+            glm::vec3 right = glm::normalize(glm::cross(camera.front, glm::vec3(0.f, 1.f, 0.f)));
+            glm::vec3 up    = glm::cross(right, camera.front);
+
+            for (int i = 0; i < toSpawn && (int)particles.size() < MAX_PT; ++i) {
+                Particle p;
+                p.pos     = shipPos + back * 1.2f
+                          + right * randF(-0.45f, 0.45f)
+                          + up    * randF(-0.5f, 0.5f);
+                p.vel     = back  * randF(8.f, 16.f)
+                          + right * randF(-1.5f, 1.5f)
+                          + up    * randF(-1.f,  1.f);
+                p.maxLife = randF(0.2f, 0.35f);
+                p.life    = p.maxLife;
+                p.size    = randF(4.f, 8.f);
+                particles.push_back(p);
+            }
+        }
+
+        // Update fire particles
+        for (auto& p : particles) {
+            p.pos  += p.vel * deltaTime;
+            p.vel  *= (1.f - 3.f * deltaTime); // drag
+            p.life -= deltaTime;
+        }
+        particles.erase(
+            std::remove_if(particles.begin(), particles.end(),
+                [](const Particle& p){ return p.life <= 0.f; }),
+            particles.end());
 
         // Spawn new asteroids
         if (currentFrame >= nextSpawnTime) {
@@ -343,6 +413,47 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
         skybox.draw();
 
+        // Draw fire trail particles
+        if (!particles.empty()) {
+            std::vector<float> gpuBuf;
+            gpuBuf.reserve(particles.size() * 8);
+            for (auto& p : particles) {
+                float t = p.life / p.maxLife; // 1=fresh, 0=dead
+                glm::vec3 col;
+                float alpha;
+                if (t > 0.5f) {
+                    float u = (t - 0.5f) * 2.f;
+                    col   = glm::mix(glm::vec3(1.f, 0.4f, 0.f), glm::vec3(1.f, 0.92f, 0.4f), u);
+                    alpha = glm::mix(0.5f, 0.65f, u);
+                } else {
+                    float u = t * 2.f;
+                    col   = glm::mix(glm::vec3(0.25f, 0.f, 0.f), glm::vec3(1.f, 0.4f, 0.f), u);
+                    alpha = u * 0.5f;
+                }
+                float sz = p.size * t;
+                gpuBuf.push_back(p.pos.x); gpuBuf.push_back(p.pos.y); gpuBuf.push_back(p.pos.z);
+                gpuBuf.push_back(col.r);   gpuBuf.push_back(col.g);   gpuBuf.push_back(col.b);
+                gpuBuf.push_back(alpha);
+                gpuBuf.push_back(sz);
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            (GLsizeiptr)(gpuBuf.size() * sizeof(float)), gpuBuf.data());
+
+            particleShader.use();
+            particleShader.setMat4("view",       view);
+            particleShader.setMat4("projection", projection);
+            particleShader.setBool("isPoint",    true);
+
+            glDepthMask(GL_FALSE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow
+            glBindVertexArray(ptVAO);
+            glDrawArrays(GL_POINTS, 0, (GLsizei)particles.size());
+            glBindVertexArray(0);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_TRUE);
+        }
+
         // Draw stars (billboards at "infinity")
         glDepthFunc(GL_LEQUAL);
         starShader.use();
@@ -362,6 +473,8 @@ int main()
     }
 
     // Cleanup
+    glDeleteVertexArrays(1, &ptVAO);
+    glDeleteBuffers(1, &ptVBO);
     glDeleteVertexArrays(1, &sunVAO);
     glDeleteBuffers(1, &sunVBO);
     glDeleteBuffers(1, &sunEBO);
