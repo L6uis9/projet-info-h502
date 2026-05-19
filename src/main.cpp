@@ -3,7 +3,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 
@@ -19,10 +21,23 @@ static const int   SCR_W  = 1280;
 static const int   SCR_H  = 720;
 static const char* TITLE  = "Space Game";
 
+// Asteroid system settings
+static const int   ASTEROID_MESH_POOL      = 15;    // distinct pre-generated shapes
+static const float ASTEROID_MIN_SPAWN_RADIUS = 40.f;  // minimum spawn distance from ship
+static const float ASTEROID_SPAWN_RADIUS     = 100.f; // maximum spawn distance from ship
+static const float ASTEROID_DESPAWN_DIST   = 170.f; // remove when farther than this from ship
+static const float ASTEROID_MIN_SCALE      = 0.8f;
+static const float ASTEROID_MAX_SCALE      = 4.5f;
+static const float ASTEROID_MIN_SPEED      = 8.f;
+static const float ASTEROID_MAX_SPEED      = 20.f;
+static const float ASTEROID_SPAWN_INTERVAL = 0.4f;  // seconds between spawns
+static const int   ASTEROID_MAX_COUNT      = 80;
+static const float ASTEROID_TOWARD_SHIP_PROBA = 0.1f;
+
 // Globals
 static Camera     camera;
 static glm::vec3  shipPos    = {0.f, 0.f, 0.f};
-static float      shipSpeed  = 10.f;
+static float      shipSpeed  = 25.f;
 static float      lastX      = SCR_W / 2.f;
 static float      lastY      = SCR_H / 2.f;
 static bool       firstMouse = true;
@@ -132,36 +147,61 @@ int main()
     spaceship.load("assets/models/spaceship.obj",
                    "assets/textures/spaceship");
 
-    // Asteroids – each has a different seed → unique shape
+    // Asteroid texture and mesh pool (pre-generated to avoid runtime cost)
+    GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
+
+    std::vector<Asteroid> asteroidPool(ASTEROID_MESH_POOL);
+    for (int i = 0; i < ASTEROID_MESH_POOL; i++) {
+        asteroidPool[i].generate(i);
+        asteroidPool[i].mesh.material.diffuseTexture = asteroidTex;
+        asteroidPool[i].mesh.material.hasDiffuse     = true;
+    }
+
     struct AsteroidInstance {
-        Asteroid   asteroid;
-        glm::vec3  position;
-        float      scale;
-        float      rotSpeed; // degrees per second
+        int       meshIdx;
+        glm::vec3 position;
+        glm::vec3 velocity;
+        float     scale;
+        float     rotSpeed;
+        glm::vec3 rotAxis;
+        float     rotAngle; // initial phase offset (degrees)
     };
 
     std::vector<AsteroidInstance> asteroids;
-    struct AsteroidDef { int seed; glm::vec3 pos; float scale; float rotSpeed; };
-    for (auto& d : std::initializer_list<AsteroidDef>{
-        { 0, {  12.f,  2.f, -18.f }, 2.5f,  8.f },
-        { 1, { -10.f, -3.f, -22.f }, 1.8f, 12.f },
-        { 2, {   5.f,  5.f, -30.f }, 3.2f,  5.f },
-        { 3, { -18.f,  1.f, -15.f }, 1.2f, 20.f },
-        { 4, {  20.f, -4.f, -25.f }, 2.0f,  7.f },
-    }) {
-        AsteroidInstance inst;
-        inst.asteroid.generate(d.seed);
-        inst.position  = d.pos;
-        inst.scale     = d.scale;
-        inst.rotSpeed  = d.rotSpeed;
-        asteroids.push_back(std::move(inst));
-    }
+    float nextSpawnTime = 0.f;
 
-    GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
-    for (auto& inst : asteroids) {
-        inst.asteroid.mesh.material.diffuseTexture = asteroidTex;
-        inst.asteroid.mesh.material.hasDiffuse     = true;
-    }
+    srand(42);
+
+    auto randF = [](float lo, float hi) -> float {
+        return lo + (float)rand() / RAND_MAX * (hi - lo);
+    };
+    auto randUnitVec = [&]() -> glm::vec3 {
+        float u     = randF(-1.f, 1.f);
+        float theta = randF(0.f, 2.f * glm::pi<float>());
+        float r     = std::sqrt(std::max(0.f, 1.f - u * u));
+        return { r * std::cos(theta), u, r * std::sin(theta) };
+    };
+
+    auto spawnAsteroid = [&]() {
+        if ((int)asteroids.size() >= ASTEROID_MAX_COUNT) return;
+
+        float spawnDist = randF(ASTEROID_MIN_SPAWN_RADIUS, ASTEROID_SPAWN_RADIUS);
+        glm::vec3 spawnPos = shipPos + randUnitVec() * spawnDist;
+
+        glm::vec3 dir = (randF(0.f, 1.f) < ASTEROID_TOWARD_SHIP_PROBA)
+                        ? glm::normalize(shipPos - spawnPos)
+                        : randUnitVec();
+
+        AsteroidInstance inst;
+        inst.meshIdx  = rand() % ASTEROID_MESH_POOL;
+        inst.position = spawnPos;
+        inst.velocity = dir * randF(ASTEROID_MIN_SPEED, ASTEROID_MAX_SPEED);
+        inst.scale    = randF(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
+        inst.rotSpeed = randF(5.f, 30.f);
+        inst.rotAxis  = randUnitVec();
+        inst.rotAngle = randF(0.f, 360.f);
+        asteroids.push_back(inst);
+    };
 
     // Pre-configure skybox shader sampler
     skyboxShader.use();
@@ -213,6 +253,25 @@ int main()
         glfwPollEvents();
         processInput(window);
 
+
+        // Spawn new asteroids
+        if (currentFrame >= nextSpawnTime) {
+            spawnAsteroid();
+            nextSpawnTime = currentFrame + ASTEROID_SPAWN_INTERVAL;
+        }
+
+        // Move asteroids and remove those too far from the ship
+        for (auto& a : asteroids)
+            a.position += a.velocity * deltaTime;
+
+        asteroids.erase(
+            std::remove_if(asteroids.begin(), asteroids.end(),
+                [&](const AsteroidInstance& a) {
+                    return glm::length(a.position - shipPos) > ASTEROID_DESPAWN_DIST;
+                }),
+            asteroids.end()
+        );
+
         // Clear
         glClearColor(0.01f, 0.01f, 0.02f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -258,18 +317,19 @@ int main()
         for (auto& inst : asteroids) {
             glm::mat4 am = glm::mat4(1.f);
             am = glm::translate(am, inst.position);
-            am = glm::rotate(am, glm::radians(inst.rotSpeed * (float)glfwGetTime()),
-                             glm::vec3(0.3f, 1.f, 0.2f));
+            am = glm::rotate(am, glm::radians(inst.rotAngle + inst.rotSpeed * currentFrame),
+                             inst.rotAxis);
             am = glm::scale(am, glm::vec3(inst.scale));
 
-            modelShader.setMat4("model", am);
-            modelShader.setBool("hasDiffuse", inst.asteroid.mesh.material.hasDiffuse);
-            modelShader.setVec3("matKd",      inst.asteroid.mesh.material.Kd);
-            if (inst.asteroid.mesh.material.hasDiffuse) {
+            Mesh& amesh = asteroidPool[inst.meshIdx].mesh;
+            modelShader.setMat4("model",     am);
+            modelShader.setBool("hasDiffuse", amesh.material.hasDiffuse);
+            modelShader.setVec3("matKd",      amesh.material.Kd);
+            if (amesh.material.hasDiffuse) {
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, inst.asteroid.mesh.material.diffuseTexture);
+                glBindTexture(GL_TEXTURE_2D, amesh.material.diffuseTexture);
             }
-            inst.asteroid.mesh.draw();
+            amesh.draw();
         }
 
         // Draw skybox
@@ -305,6 +365,7 @@ int main()
     glDeleteVertexArrays(1, &sunVAO);
     glDeleteBuffers(1, &sunVBO);
     glDeleteBuffers(1, &sunEBO);
+    for (auto& a : asteroidPool) a.free();
     spaceship.free();
     skybox.free();
     glfwTerminate();
