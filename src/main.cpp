@@ -255,6 +255,13 @@ int main()
     static const int   MAX_PT    = 500;
     static const float PT_RATE   = 100.f; // particles per second
 
+    // Asteroid trail particle system
+    static const int   MAX_APT              = 4000;
+    static const float ASTEROID_TRAIL_RATE  = 20.f; // particles per second per asteroid
+
+    std::vector<Particle> asteroidParticles;
+    asteroidParticles.reserve(MAX_APT);
+
     std::vector<Particle> particles;
     particles.reserve(MAX_PT);
     float ptSpawnAccum = 0.f;
@@ -266,6 +273,21 @@ int main()
     glBindVertexArray(ptVAO);
     glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
     glBufferData(GL_ARRAY_BUFFER, MAX_PT * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(7 * sizeof(float)));
+    glBindVertexArray(0);
+
+    // Asteroid trail VAO/VBO (same layout as fire trail: vec3 pos | vec4 color | float size)
+    GLuint aptVAO, aptVBO;
+    glGenVertexArrays(1, &aptVAO);
+    glGenBuffers(1, &aptVBO);
+    glBindVertexArray(aptVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, aptVBO);
+    glBufferData(GL_ARRAY_BUFFER, MAX_APT * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
@@ -331,8 +353,47 @@ int main()
         }
 
         // Move asteroids and remove those too far from the ship
-        for (auto& a : asteroids)
+        for (auto& a : asteroids) {
             a.position += a.velocity * deltaTime;
+
+            // Spawn blue trail particles behind each asteroid
+            if ((int)asteroidParticles.size() < MAX_APT &&
+                randF(0.f, 1.f) < ASTEROID_TRAIL_RATE * deltaTime)
+            {
+                float vlen = glm::length(a.velocity);
+                if (vlen > 0.01f) {
+                    glm::vec3 back = -a.velocity / vlen;
+                    glm::vec3 ref  = (std::abs(back.y) < 0.9f) ? glm::vec3(0.f, 1.f, 0.f)
+                                                                : glm::vec3(1.f, 0.f, 0.f);
+                    glm::vec3 perpA = glm::normalize(glm::cross(back, ref));
+                    glm::vec3 perpB = glm::cross(back, perpA);
+                    float spread = a.scale * 0.35f;
+
+                    Particle p;
+                    p.pos     = a.position + back * a.scale * 0.6f
+                              + perpA * randF(-spread, spread)
+                              + perpB * randF(-spread, spread);
+                    p.vel     = back  * randF(2.f, 7.f)
+                              + perpA * randF(-1.f, 1.f)
+                              + perpB * randF(-1.f, 1.f);
+                    p.maxLife = randF(0.6f, 1.2f);
+                    p.life    = p.maxLife;
+                    p.size    = randF(6.f, 14.f) * std::min(a.scale, 3.f);
+                    asteroidParticles.push_back(p);
+                }
+            }
+        }
+
+        // Update asteroid trail particles
+        for (auto& p : asteroidParticles) {
+            p.pos  += p.vel * deltaTime;
+            p.vel  *= (1.f - 2.f * deltaTime);
+            p.life -= deltaTime;
+        }
+        asteroidParticles.erase(
+            std::remove_if(asteroidParticles.begin(), asteroidParticles.end(),
+                [](const Particle& p){ return p.life <= 0.f; }),
+            asteroidParticles.end());
 
         asteroids.erase(
             std::remove_if(asteroids.begin(), asteroids.end(),
@@ -489,6 +550,47 @@ int main()
             glDepthMask(GL_TRUE);
         }
 
+        // Draw asteroid blue trail particles
+        if (!asteroidParticles.empty()) {
+            std::vector<float> aptBuf;
+            aptBuf.reserve(asteroidParticles.size() * 8);
+            for (auto& p : asteroidParticles) {
+                float t = p.life / p.maxLife; // 1=fresh, 0=dead
+                glm::vec3 col;
+                float alpha;
+                if (t > 0.5f) {
+                    float u = (t - 0.5f) * 2.f;
+                    col   = glm::mix(glm::vec3(0.2f, 0.5f, 1.0f), glm::vec3(0.6f, 0.9f, 1.0f), u);
+                    alpha = glm::mix(0.7f, 0.9f, u);
+                } else {
+                    float u = t * 2.f;
+                    col   = glm::mix(glm::vec3(0.0f, 0.05f, 0.3f), glm::vec3(0.2f, 0.5f, 1.0f), u);
+                    alpha = u * 0.7f;
+                }
+                float sz = p.size * t;
+                aptBuf.push_back(p.pos.x); aptBuf.push_back(p.pos.y); aptBuf.push_back(p.pos.z);
+                aptBuf.push_back(col.r);   aptBuf.push_back(col.g);   aptBuf.push_back(col.b);
+                aptBuf.push_back(alpha);
+                aptBuf.push_back(sz);
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, aptVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            (GLsizeiptr)(aptBuf.size() * sizeof(float)), aptBuf.data());
+
+            particleShader.use();
+            particleShader.setMat4("view",       view);
+            particleShader.setMat4("projection", projection);
+            particleShader.setBool("isPoint",    true);
+
+            glDepthMask(GL_FALSE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            glBindVertexArray(aptVAO);
+            glDrawArrays(GL_POINTS, 0, (GLsizei)asteroidParticles.size());
+            glBindVertexArray(0);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_TRUE);
+        }
+
         // Draw stars (billboards at "infinity")
         glDepthFunc(GL_LEQUAL);
         starShader.use();
@@ -510,6 +612,8 @@ int main()
     // Cleanup
     glDeleteVertexArrays(1, &ptVAO);
     glDeleteBuffers(1, &ptVBO);
+    glDeleteVertexArrays(1, &aptVAO);
+    glDeleteBuffers(1, &aptVBO);
     glDeleteVertexArrays(1, &sunVAO);
     glDeleteBuffers(1, &sunVBO);
     glDeleteBuffers(1, &sunEBO);
