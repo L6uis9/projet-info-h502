@@ -252,7 +252,7 @@ int main()
         float     size;
     };
 
-    static const int   MAX_PT    = 200;
+    static const int   MAX_PT    = 500;
     static const float PT_RATE   = 100.f; // particles per second
 
     std::vector<Particle> particles;
@@ -341,6 +341,41 @@ int main()
                 }),
             asteroids.end()
         );
+
+        // Asteroid-asteroid sphere collision detection
+        {
+            std::vector<bool> explode(asteroids.size(), false);
+            for (int i = 0; i < (int)asteroids.size(); i++) {
+                for (int j = i + 1; j < (int)asteroids.size(); j++) {
+                    float dist    = glm::length(asteroids[i].position - asteroids[j].position);
+                    float radSum  = asteroids[i].scale + asteroids[j].scale;
+                    if (dist < radSum) {
+                        explode[i] = true;
+                        explode[j] = true;
+                    }
+                }
+            }
+            for (int i = 0; i < (int)asteroids.size(); i++) {
+                if (!explode[i]) continue;
+                glm::vec3 center = asteroids[i].position;
+                int count = 15 + (int)(asteroids[i].scale * 5.f);
+                for (int k = 0; k < count && (int)particles.size() < MAX_PT; k++) {
+                    Particle p;
+                    p.pos     = center + randUnitVec() * asteroids[i].scale * 0.4f;
+                    p.vel     = randUnitVec() * randF(4.f, 18.f);
+                    p.maxLife = randF(0.5f, 1.2f);
+                    p.life    = p.maxLife;
+                    p.size    = randF(8.f, 18.f);
+                    particles.push_back(p);
+                }
+            }
+            std::vector<AsteroidInstance> survivors;
+            survivors.reserve(asteroids.size());
+            for (int i = 0; i < (int)asteroids.size(); i++) {
+                if (!explode[i]) survivors.push_back(asteroids[i]);
+            }
+            asteroids = std::move(survivors);
+        }
 
         // Clear
         glClearColor(0.01f, 0.01f, 0.02f, 1.f);
