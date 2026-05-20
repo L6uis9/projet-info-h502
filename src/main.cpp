@@ -28,8 +28,8 @@ static const float ASTEROID_SPAWN_RADIUS     = 200.f; // maximum spawn distance 
 static const float ASTEROID_DESPAWN_DIST   = 170.f; // remove when farther than this from ship
 static const float ASTEROID_MIN_SCALE      = 0.1f;
 static const float ASTEROID_MAX_SCALE      = 4.5f;
-static const float ASTEROID_MIN_SPEED      = 15.f;
-static const float ASTEROID_MAX_SPEED      = 25.f;
+static const float ASTEROID_MIN_SPEED      = 40.f;
+static const float ASTEROID_MAX_SPEED      = 60.f;
 static const float ASTEROID_SPAWN_INTERVAL = 0.01f;  // seconds between spawns
 static const int   ASTEROID_MAX_COUNT      = 200;
 static const float ASTEROID_TOWARD_SHIP_PROBA = 0.2f;
@@ -40,7 +40,7 @@ static const float SHIP_INVINCIBILITY = 2.0f; // seconds of invincibility after 
 
 // Ship physics settings
 static const float SHIP_ACCEL = 50.f;
-static const float SHIP_DRAG  = 2.0f;
+static const float SHIP_DRAG  = 0.5f;
 
 // Globals
 static Camera     camera;
