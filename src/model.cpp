@@ -173,11 +173,11 @@ void Model::load(const std::string& objPath, const std::string& texDir)
         ss >> token;
 
         if (token == "mtllib") {
-            std::string mtlFile; ss >> mtlFile;
+            std::string mtlFile;
+            std::getline(ss, mtlFile);
+            size_t s = mtlFile.find_first_not_of(" \t");
+            if (s != std::string::npos) mtlFile = mtlFile.substr(s);
             std::string mtlPath = objDir + "/" + mtlFile;
-            if (!fs::exists(mtlPath)) {
-                mtlPath = objDir + "/spaceship.mtl";
-            }
             matLib = parseMTL(mtlPath, texDir);
         } else if (token == "usemtl") {
             flushMesh();

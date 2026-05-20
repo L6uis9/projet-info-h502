@@ -161,6 +161,12 @@ int main()
     spaceship.load("assets/models/spaceship.obj",
                    "assets/textures/spaceship");
 
+    // Earth planet
+    Model earth;
+    earth.load("assets/models/Earth 2K.obj", "assets/textures/earth");
+    static const glm::vec3 EARTH_POS   = {0.f, -50.f, -700.f};
+    static const float     EARTH_SCALE = 50.f;
+
     // Asteroid texture and mesh pool (pre-generated to avoid runtime cost)
     GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
 
@@ -607,6 +613,44 @@ int main()
             }
         }
 
+        // Draw Earth planet
+        modelShader.setBool("useTriplanar", false);
+        {
+            glm::mat4 em = glm::mat4(1.f);
+            em = glm::translate(em, EARTH_POS);
+            em = glm::rotate(em, glm::radians(currentFrame * 3.f), glm::vec3(0.f, 1.f, 0.f));
+            em = glm::scale(em, glm::vec3(EARTH_SCALE));
+            modelShader.setMat4("model", em);
+
+            // Earth surface
+            for (auto& mesh : earth.meshes) {
+                if (mesh.material.name != "Earth") continue;
+                modelShader.setBool("hasDiffuse", mesh.material.hasDiffuse);
+                modelShader.setVec3("matKd",      mesh.material.Kd);
+                if (mesh.material.hasDiffuse) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, mesh.material.diffuseTexture);
+                }
+                mesh.draw();
+            }
+
+            // Clouds
+            glDepthMask(GL_FALSE);
+            glBlendFunc(GL_ONE, GL_ONE);
+            for (auto& mesh : earth.meshes) {
+                if (mesh.material.name != "Clouds") continue;
+                modelShader.setBool("hasDiffuse", mesh.material.hasDiffuse);
+                modelShader.setVec3("matKd",      mesh.material.Kd);
+                if (mesh.material.hasDiffuse) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, mesh.material.diffuseTexture);
+                }
+                mesh.draw();
+            }
+            glDepthMask(GL_TRUE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
         // Draw asteroids
         modelShader.setBool("useTriplanar", true);
         for (auto& inst : asteroids) {
@@ -780,6 +824,7 @@ int main()
     glDeleteBuffers(1, &sunEBO);
     for (auto& a : asteroidPool) a.free();
     spaceship.free();
+    earth.free();
     skybox.free();
     glfwTerminate();
     return 0;
