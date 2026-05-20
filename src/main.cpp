@@ -38,10 +38,14 @@ static const float ASTEROID_TOWARD_SHIP_PROBA = 0.2f;
 static const float SHIP_RADIUS       = 1.5f;  // approximate sphere radius
 static const float SHIP_INVINCIBILITY = 2.0f; // seconds of invincibility after being hit
 
+// Ship physics settings
+static const float SHIP_ACCEL = 50.f;
+static const float SHIP_DRAG  = 2.0f;
+
 // Globals
 static Camera     camera;
-static glm::vec3  shipPos    = {0.f, 0.f, 0.f};
-static float      shipSpeed  = 25.f;
+static glm::vec3  shipPos      = {0.f, 0.f, 0.f};
+static glm::vec3  shipVelocity = {0.f, 0.f, 0.f};
 static float      lastX      = SCR_W / 2.f;
 static float      lastY      = SCR_H / 2.f;
 static bool       firstMouse = true;
@@ -84,13 +88,15 @@ static void key_cb(GLFWwindow* win, int key, int, int action, int)
         glfwSetWindowShouldClose(win, true);
 }
 
-// Continuous key handling – moves the spaceship, then snaps camera behind it
+// Continuous key handling – updates ship velocity, then snaps camera behind it
 static void processInput(GLFWwindow* win)
 {
     glm::vec3 fwd = camera.front;
 
     if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(win, GLFW_KEY_Z) == GLFW_PRESS)
-        shipPos += shipSpeed * deltaTime * fwd;
+        shipVelocity += fwd * SHIP_ACCEL * deltaTime;
+
+    shipVelocity *= std::max(0.f, 1.f - SHIP_DRAG * deltaTime);
 
     lookBack = (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS);
 
@@ -311,7 +317,20 @@ int main()
 
         // Input
         glfwPollEvents();
+        shipPos += shipVelocity * deltaTime;
         processInput(window);
+
+        // Debug title
+        
+        {
+            char title[128];
+            float speed = glm::length(shipVelocity);
+            snprintf(title, sizeof(title),
+                "Space Game | spd: %.1f  pos: (%.1f, %.1f, %.1f)",
+                speed, shipPos.x, shipPos.y, shipPos.z);
+            glfwSetWindowTitle(window, title);
+        }
+        
 
         // Fire trail: spawn particles when thrusting
         bool thrusting = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
