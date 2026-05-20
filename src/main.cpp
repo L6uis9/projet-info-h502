@@ -230,15 +230,13 @@ int main()
     // All stars: single source of truth for both lighting and visual rendering
     struct VisualStar { glm::vec3 dir; glm::vec3 color; float radius; };
     const std::vector<VisualStar> visualStars = {
-        { glm::normalize(glm::vec3( 4000.f,  1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f }, // main sun
-        { glm::normalize(glm::vec3(-3000.f,   800.f, -1500.f)), glm::vec3(1.00f, 0.85f, 0.15f), 0.07f }, // yellow star
-        { glm::normalize(glm::vec3(-2000.f,   600.f,  3000.f)), glm::vec3(0.35f, 0.65f, 1.00f), 0.06f }, // blue star
+        { glm::normalize(glm::vec3( 4000.f,  1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f }, // sun
     };
 
     // Pre-configure model shader
     modelShader.use();
     modelShader.setInt ("diffuseMap",   0);
-    modelShader.setVec3("ambientColor", {0.04f, 0.04f, 0.07f});
+    modelShader.setVec3("ambientColor", {0.005f, 0.005f, 0.008f});
     modelShader.setInt ("numStars",     (int)visualStars.size());
     for (int i = 0; i < (int)visualStars.size(); i++) {
         modelShader.setVec3("starDirs["   + std::to_string(i) + "]", visualStars[i].dir);
