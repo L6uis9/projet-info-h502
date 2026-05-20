@@ -141,7 +141,8 @@ int main()
     Shader modelShader   ("shaders/model.vert",    "shaders/model.frag");
     Shader skyboxShader  ("shaders/skybox.vert",   "shaders/skybox.frag");
     Shader starShader    ("shaders/star.vert",     "shaders/star.frag");
-    Shader particleShader("shaders/particle.vert", "shaders/particle.frag");
+    Shader particleShader  ("shaders/particle.vert",   "shaders/particle.frag");
+    Shader motionBlurShader("shaders/motionblur.vert", "shaders/motionblur.frag");
 
     // Skybox
     // px=right, nx=left, py=top, ny=bottom, pz=front, nz=back
@@ -305,6 +306,50 @@ int main()
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(7 * sizeof(float)));
+    glBindVertexArray(0);
+
+    // FBO for motion blur post-process
+    int fboW, fboH;
+    glfwGetFramebufferSize(window, &fboW, &fboH);
+
+    GLuint sceneFBO, sceneColorTex, sceneDepthRBO;
+    glGenFramebuffers(1, &sceneFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+
+    glGenTextures(1, &sceneColorTex);
+    glBindTexture(GL_TEXTURE_2D, sceneColorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fboW, fboH, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColorTex, 0);
+
+    glGenRenderbuffers(1, &sceneDepthRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, sceneDepthRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, fboW, fboH);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sceneDepthRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Full-screen quad for post-processing
+    const float quadVerts[] = {
+        -1.f, -1.f,  0.f, 0.f,
+         1.f, -1.f,  1.f, 0.f,
+         1.f,  1.f,  1.f, 1.f,
+        -1.f,  1.f,  0.f, 1.f,
+    };
+    const unsigned int quadIdx[] = { 0,1,2, 0,2,3 };
+    GLuint quadVAO, quadVBO, quadEBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glGenBuffers(1, &quadEBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quadEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIdx), quadIdx, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
 
     // Game loop
@@ -513,7 +558,9 @@ int main()
             }
         }
 
-        // Clear
+        // Render scene into off-screen FBO (for motion blur post-process)
+        glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+        glViewport(0, 0, fboW, fboH);
         glClearColor(0.01f, 0.01f, 0.02f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -688,10 +735,42 @@ int main()
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
 
+        // Motion blur post-process
+        {
+            int curW, curH;
+            glfwGetFramebufferSize(window, &curW, &curH);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, curW, curH);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_BLEND);
+
+            float speed = glm::length(shipVelocity);
+            float blurStrength = glm::clamp(speed / 100.f, 0.f, 1.f) * 0.08f;
+
+            motionBlurShader.use();
+            motionBlurShader.setInt  ("screenTexture", 0);
+            motionBlurShader.setFloat("blurStrength",  blurStrength);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, sceneColorTex);
+            glBindVertexArray(quadVAO);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
+
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
         glfwSwapBuffers(window);
     }
 
     // Cleanup
+    glDeleteFramebuffers(1, &sceneFBO);
+    glDeleteTextures(1, &sceneColorTex);
+    glDeleteRenderbuffers(1, &sceneDepthRBO);
+    glDeleteVertexArrays(1, &quadVAO);
+    glDeleteBuffers(1, &quadVBO);
+    glDeleteBuffers(1, &quadEBO);
     glDeleteVertexArrays(1, &ptVAO);
     glDeleteBuffers(1, &ptVBO);
     glDeleteVertexArrays(1, &aptVAO);
