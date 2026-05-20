@@ -34,6 +34,10 @@ static const float ASTEROID_SPAWN_INTERVAL = 0.01f;  // seconds between spawns
 static const int   ASTEROID_MAX_COUNT      = 200;
 static const float ASTEROID_TOWARD_SHIP_PROBA = 0.2f;
 
+// Ship collision settings
+static const float SHIP_RADIUS       = 1.5f;  // approximate sphere radius
+static const float SHIP_INVINCIBILITY = 2.0f; // seconds of invincibility after being hit
+
 // Globals
 static Camera     camera;
 static glm::vec3  shipPos    = {0.f, 0.f, 0.f};
@@ -44,6 +48,7 @@ static bool       firstMouse = true;
 static float      deltaTime  = 0.f;
 static float      lastFrame  = 0.f;
 static bool       lookBack   = false;
+static float      shipInvincibleUntil = 0.f;
 
 // GLFW callbacks
 
@@ -438,6 +443,57 @@ int main()
             asteroids = std::move(survivors);
         }
 
+        // Asteroid-ship sphere collision detection
+        if (currentFrame > shipInvincibleUntil) {
+            std::vector<bool> hitShip(asteroids.size(), false);
+            for (int i = 0; i < (int)asteroids.size(); i++) {
+                float dist = glm::length(asteroids[i].position - shipPos);
+                if (dist < SHIP_RADIUS + asteroids[i].scale)
+                    hitShip[i] = true;
+            }
+
+            bool anyHit = false;
+            for (int i = 0; i < (int)asteroids.size(); i++) {
+                if (!hitShip[i]) continue;
+                anyHit = true;
+
+                // Explosion centred on the ship
+                int shipCount = 50;
+                for (int k = 0; k < shipCount && (int)particles.size() < MAX_PT; k++) {
+                    Particle p;
+                    p.pos     = shipPos + randUnitVec() * randF(0.2f, 1.5f);
+                    p.vel     = randUnitVec() * randF(8.f, 28.f);
+                    p.maxLife = randF(0.7f, 1.8f);
+                    p.life    = p.maxLife;
+                    p.size    = randF(12.f, 24.f);
+                    particles.push_back(p);
+                }
+
+                // Explosion centred on the asteroid
+                glm::vec3 astCenter = asteroids[i].position;
+                int astCount = 15 + (int)(asteroids[i].scale * 5.f);
+                for (int k = 0; k < astCount && (int)particles.size() < MAX_PT; k++) {
+                    Particle p;
+                    p.pos     = astCenter + randUnitVec() * asteroids[i].scale * 0.4f;
+                    p.vel     = randUnitVec() * randF(4.f, 18.f);
+                    p.maxLife = randF(0.5f, 1.2f);
+                    p.life    = p.maxLife;
+                    p.size    = randF(8.f, 18.f);
+                    particles.push_back(p);
+                }
+            }
+
+            if (anyHit) {
+                shipInvincibleUntil = currentFrame + SHIP_INVINCIBILITY;
+                std::vector<AsteroidInstance> survivors;
+                survivors.reserve(asteroids.size());
+                for (int i = 0; i < (int)asteroids.size(); i++) {
+                    if (!hitShip[i]) survivors.push_back(asteroids[i]);
+                }
+                asteroids = std::move(survivors);
+            }
+        }
+
         // Clear
         glClearColor(0.01f, 0.01f, 0.02f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -453,7 +509,10 @@ int main()
                                            glm::vec3(0.f, 1.f, 0.f));
         glm::mat4 projection = camera.projMatrix(aspect);
 
-        // Draw spaceship
+        // Draw spaceship (blink during invincibility frames)
+        bool drawShip = (currentFrame > shipInvincibleUntil) ||
+                        (fmod(currentFrame * 8.f, 1.f) < 0.5f);
+
         modelShader.use();
         modelShader.setBool("useTriplanar", false);
 
@@ -469,15 +528,17 @@ int main()
         modelShader.setMat4("projection", projection);
         modelShader.setVec3("viewPos",    camera.position);
 
-        for (auto& mesh : spaceship.meshes) {
-            modelShader.setBool ("hasDiffuse", mesh.material.hasDiffuse);
-            modelShader.setVec3 ("matKd",      mesh.material.Kd);
-            if (mesh.material.hasDiffuse) {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, mesh.material.diffuseTexture);
-                modelShader.setInt("diffuseMap", 0);
+        if (drawShip) {
+            for (auto& mesh : spaceship.meshes) {
+                modelShader.setBool ("hasDiffuse", mesh.material.hasDiffuse);
+                modelShader.setVec3 ("matKd",      mesh.material.Kd);
+                if (mesh.material.hasDiffuse) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, mesh.material.diffuseTexture);
+                    modelShader.setInt("diffuseMap", 0);
+                }
+                mesh.draw();
             }
-            mesh.draw();
         }
 
         // Draw asteroids
