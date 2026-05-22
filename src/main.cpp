@@ -53,6 +53,7 @@ static float      deltaTime  = 0.f;
 static float      lastFrame  = 0.f;
 static bool       lookBack   = false;
 static float      shipInvincibleUntil = 0.f;
+static bool       shipReflective = false;
 
 // GLFW callbacks
 
@@ -86,6 +87,8 @@ static void key_cb(GLFWwindow* win, int key, int, int action, int)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(win, true);
+    if (key == GLFW_KEY_X && action == GLFW_PRESS)
+        shipReflective = !shipReflective;
 }
 
 // Continuous key handling – updates ship velocity, then snaps camera behind it
@@ -236,6 +239,7 @@ int main()
     // Pre-configure model shader
     modelShader.use();
     modelShader.setInt ("diffuseMap",   0);
+    modelShader.setInt ("skyboxMap",    1);
     modelShader.setVec3("ambientColor", {0.005f, 0.005f, 0.008f});
     modelShader.setInt ("numStars",     (int)visualStars.size());
     for (int i = 0; i < (int)visualStars.size(); i++) {
@@ -544,6 +548,9 @@ int main()
         modelShader.setVec3("viewPos",    camera.position);
 
         if (drawShip) {
+            modelShader.setBool("reflective", shipReflective);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
             for (auto& mesh : spaceship.meshes) {
                 modelShader.setBool ("hasDiffuse", mesh.material.hasDiffuse);
                 modelShader.setVec3 ("matKd",      mesh.material.Kd);
@@ -555,6 +562,7 @@ int main()
                 mesh.draw();
             }
         }
+        modelShader.setBool("reflective", false);
 
         // Draw Earth planet
         modelShader.setBool("useTriplanar", false);

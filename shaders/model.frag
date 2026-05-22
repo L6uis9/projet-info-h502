@@ -8,10 +8,12 @@ in vec3 LocalNormal;
 
 out vec4 FragColor;
 
-uniform sampler2D diffuseMap;
-uniform bool      hasDiffuse;
-uniform bool      useTriplanar;
-uniform vec3      matKd;
+uniform sampler2D   diffuseMap;
+uniform samplerCube skyboxMap;
+uniform bool        hasDiffuse;
+uniform bool        useTriplanar;
+uniform bool        reflective;
+uniform vec3        matKd;
 
 #define MAX_STARS 4
 uniform vec3 starDirs[MAX_STARS];   // unit vectors pointing FROM fragment TOWARD each star
@@ -23,6 +25,17 @@ uniform vec3 viewPos;
 
 void main()
 {
+    vec3 norm    = normalize(Normal);
+    vec3 viewDir = normalize(viewPos - FragPos);
+
+    if (reflective) {
+        vec3 I = -viewDir;
+        vec3 R = reflect(I, norm);
+        vec3 envColor = texture(skyboxMap, R).rgb;
+        FragColor = vec4(envColor , 1.0);
+        return;
+    }
+
     vec3 baseColor;
     if (hasDiffuse && useTriplanar) {
         // Triplanar mapping: sample from 3 orthogonal planes and blend by normal
@@ -38,8 +51,6 @@ void main()
     } else {
         baseColor = hasDiffuse ? texture(diffuseMap, TexCoord).rgb : matKd;
     }
-    vec3 norm      = normalize(Normal);
-    vec3 viewDir   = normalize(viewPos - FragPos);
 
     vec3 result = ambientColor * baseColor;
 
