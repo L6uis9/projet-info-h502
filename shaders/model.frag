@@ -13,6 +13,8 @@ uniform samplerCube skyboxMap;
 uniform bool        hasDiffuse;
 uniform bool        useTriplanar;
 uniform bool        reflective;
+uniform bool        refractive;
+uniform float       refractiveIndex;
 uniform vec3        matKd;
 
 #define MAX_STARS 4
@@ -32,7 +34,16 @@ void main()
         vec3 I = -viewDir;
         vec3 R = reflect(I, norm);
         vec3 envColor = texture(skyboxMap, R).rgb;
-        FragColor = vec4(envColor , 1.0);
+        FragColor = vec4(envColor, 1.0);
+        return;
+    }
+
+    if (refractive) {
+        vec3 I = -viewDir;
+        float ratio = 1.0 / refractiveIndex;
+        vec3 R = refract(I, norm, ratio);
+        vec3 envColor = texture(skyboxMap, R).rgb;
+        FragColor = vec4(envColor, 1.0);
         return;
     }
 

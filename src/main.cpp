@@ -552,9 +552,11 @@ int main()
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
             for (auto& mesh : spaceship.meshes) {
-                modelShader.setBool ("hasDiffuse", mesh.material.hasDiffuse);
-                modelShader.setVec3 ("matKd",      mesh.material.Kd);
-                if (mesh.material.hasDiffuse) {
+                modelShader.setBool ("hasDiffuse",      mesh.material.hasDiffuse);
+                modelShader.setVec3 ("matKd",           mesh.material.Kd);
+                modelShader.setBool ("refractive",      mesh.material.refractive);
+                modelShader.setFloat("refractiveIndex", mesh.material.Ni);
+                if (mesh.material.hasDiffuse && !mesh.material.refractive) {
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, mesh.material.diffuseTexture);
                     modelShader.setInt("diffuseMap", 0);
@@ -563,6 +565,7 @@ int main()
             }
         }
         modelShader.setBool("reflective", false);
+        modelShader.setBool("refractive", false);
 
         // Draw Earth planet
         modelShader.setBool("useTriplanar", false);

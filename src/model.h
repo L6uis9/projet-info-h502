@@ -15,6 +15,8 @@ struct Material {
     glm::vec3   Kd  = {0.8f, 0.8f, 0.8f};
     GLuint      diffuseTexture = 0;
     bool        hasDiffuse     = false;
+    bool        refractive     = false; // Added to determine if the material is refractive based on the dissolve factor in the MTL file
+    float       Ni             = 1.0f; // Added to store the refractive index of the material, which is read from the MTL file. This will be used in the shader to calculate refraction.
 };
 
 struct Mesh {

@@ -85,6 +85,11 @@ parseMTL(const std::string& mtlPath, const std::string& texDir)
             cur = &mats[name];
         } else if (cur && token == "Kd") {
             ss >> cur->Kd.r >> cur->Kd.g >> cur->Kd.b;
+        } else if (cur && token == "Ni") { //this has been modified to set the refractive index of the material for the spaceship's windwos
+            ss >> cur->Ni;
+        } else if (cur && token == "d") { // this has been modified to set the dissolve factor of the material, which determines if it's refractive or not
+            float dissolve; ss >> dissolve;
+            if (dissolve < 1.0f) cur->refractive = true;
         } else if (cur && token == "map_Kd") {
             // Read the rest of the line to handle filenames with spaces
             std::string rawPath;
