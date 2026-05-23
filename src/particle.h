@@ -4,6 +4,7 @@
 #include <vector>
 
 class Shader;
+struct AsteroidExplosion;
 
 class ParticleSystem {
 public:
@@ -14,6 +15,7 @@ public:
 
     void init();
     void add(glm::vec3 pos, glm::vec3 vel, float maxLife, float size);
+    void spawnExplosion(const AsteroidExplosion& exp);
     bool full()  const { return (int)particles.size() >= MAX_PARTICLES; }
     int  count() const { return (int)particles.size(); }
     void update(float dt);

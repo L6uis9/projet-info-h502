@@ -1,5 +1,7 @@
 #include "particle.h"
 #include "shader.h"
+#include "asteroid.h"
+#include "utils.h"
 
 #include <algorithm>
 #include <glm/glm.hpp>
@@ -82,6 +84,15 @@ void ParticleSystem::draw(const glm::mat4& view, const glm::mat4& projection, Sh
     glBindVertexArray(0);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_TRUE);
+}
+
+void ParticleSystem::spawnExplosion(const AsteroidExplosion& exp)
+{
+    int count = 15 + (int)(exp.scale * 5.f);
+    for (int k = 0; k < count && !full(); k++)
+        add(exp.center + randUnitVec() * exp.scale * 0.4f,
+            randUnitVec() * randF(4.f, 18.f),
+            randF(0.5f, 1.2f), randF(8.f, 18.f));
 }
 
 void ParticleSystem::free()

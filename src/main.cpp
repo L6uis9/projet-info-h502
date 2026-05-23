@@ -192,14 +192,6 @@ int main()
     ParticleSystem particles;
     particles.init();
 
-    auto spawnExplosion = [&](const AsteroidExplosion& exp) {
-        int count = 15 + (int)(exp.scale * 5.f);
-        for (int k = 0; k < count && !particles.full(); k++)
-            particles.add(exp.center + randUnitVec() * exp.scale * 0.4f,
-                          randUnitVec() * randF(4.f, 18.f),
-                          randF(0.5f, 1.2f), randF(8.f, 18.f));
-    };
-
     // Pre-configure skybox shader sampler
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
@@ -327,7 +319,7 @@ int main()
         // Asteroid system update
         asteroids.trySpawn(currentFrame, shipPos);
         for (auto& exp : asteroids.update(deltaTime, shipPos))
-            spawnExplosion(exp);
+            particles.spawnExplosion(exp);
 
         // Ship collision
         std::vector<AsteroidExplosion> shipHits;
@@ -338,7 +330,7 @@ int main()
                               randUnitVec() * randF(8.f, 28.f),
                               randF(0.7f, 1.8f), randF(12.f, 24.f));
             for (auto& exp : shipHits)
-                spawnExplosion(exp);
+                particles.spawnExplosion(exp);
         }
 
         // Render scene into off-screen FBO
