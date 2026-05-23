@@ -17,6 +17,7 @@
 #include "asteroid.h"
 #include "particle.h"
 #include "textureLoader.h"
+#include "utils.h"
 
 // Window settings
 static const int   SCR_W  = 1280;
@@ -191,16 +192,6 @@ int main()
     ParticleSystem particles;
     particles.init();
 
-    // Helpers used for fire trail / explosion particle placement
-    auto randF = [](float lo, float hi) -> float {
-        return lo + (float)rand() / RAND_MAX * (hi - lo);
-    };
-    auto randUnitVec = [&]() -> glm::vec3 {
-        float u     = randF(-1.f, 1.f);
-        float theta = randF(0.f, 2.f * glm::pi<float>());
-        float r     = std::sqrt(std::max(0.f, 1.f - u * u));
-        return { r * std::cos(theta), u, r * std::sin(theta) };
-    };
     auto spawnExplosion = [&](const AsteroidExplosion& exp) {
         int count = 15 + (int)(exp.scale * 5.f);
         for (int k = 0; k < count && !particles.full(); k++)
