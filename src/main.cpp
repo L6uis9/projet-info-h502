@@ -47,6 +47,30 @@ static const float SHIP_INVINCIBILITY = 2.0f;
 static const float SHIP_ACCEL = 50.f;
 static const float SHIP_DRAG  = 1.f;
 
+// Ship hit burst particle settings
+static const int   HIT_BURST_COUNT   = 50;
+static const float HIT_SPAWN_RADIUS_MIN = 0.2f;
+static const float HIT_SPAWN_RADIUS_MAX = 1.5f;
+static const float HIT_SPEED_MIN     = 8.f;
+static const float HIT_SPEED_MAX     = 28.f;
+static const float HIT_LIFE_MIN      = 0.7f;
+static const float HIT_LIFE_MAX      = 1.8f;
+static const float HIT_SIZE_MIN      = 12.f;
+static const float HIT_SIZE_MAX      = 24.f;
+
+// Fire trail particle settings
+static const float TRAIL_BACK_OFFSET  = 1.2f;
+static const float TRAIL_SPREAD_RIGHT = 0.45f;
+static const float TRAIL_SPREAD_UP    = 0.5f;
+static const float TRAIL_SPEED_MIN    = 8.f;
+static const float TRAIL_SPEED_MAX    = 16.f;
+static const float TRAIL_SIDE_SPREAD  = 1.5f;
+static const float TRAIL_VERT_SPREAD  = 1.f;
+static const float TRAIL_LIFE_MIN     = 0.2f;
+static const float TRAIL_LIFE_MAX     = 0.35f;
+static const float TRAIL_SIZE_MIN     = 4.f;
+static const float TRAIL_SIZE_MAX     = 8.f;
+
 // Globals
 static Camera     camera;
 static glm::vec3  shipPos      = {0.f, 0.f, 0.f};
@@ -258,9 +282,9 @@ int main()
 
             for (int i = 0; i < toSpawn && !particles.full(); ++i)
                 particles.add(
-                    shipPos + back * 1.2f + right * randF(-0.45f, 0.45f) + up * randF(-0.5f, 0.5f),
-                    back * randF(8.f, 16.f) + right * randF(-1.5f, 1.5f) + up * randF(-1.f, 1.f),
-                    randF(0.2f, 0.35f), randF(4.f, 8.f));
+                    shipPos + back * TRAIL_BACK_OFFSET + right * randF(-TRAIL_SPREAD_RIGHT, TRAIL_SPREAD_RIGHT) + up * randF(-TRAIL_SPREAD_UP, TRAIL_SPREAD_UP),
+                    back * randF(TRAIL_SPEED_MIN, TRAIL_SPEED_MAX) + right * randF(-TRAIL_SIDE_SPREAD, TRAIL_SIDE_SPREAD) + up * randF(-TRAIL_VERT_SPREAD, TRAIL_VERT_SPREAD),
+                    randF(TRAIL_LIFE_MIN, TRAIL_LIFE_MAX), randF(TRAIL_SIZE_MIN, TRAIL_SIZE_MAX));
         }
 
         particles.update(deltaTime);
@@ -274,10 +298,10 @@ int main()
         std::vector<AsteroidExplosion> shipHits;
         if (asteroids.checkShipCollision(shipPos, SHIP_RADIUS, currentFrame,
                                           shipInvincibleUntil, SHIP_INVINCIBILITY, shipHits)) {
-            for (int k = 0; k < 50 && !particles.full(); k++)
-                particles.add(shipPos + randUnitVec() * randF(0.2f, 1.5f),
-                              randUnitVec() * randF(8.f, 28.f),
-                              randF(0.7f, 1.8f), randF(12.f, 24.f));
+            for (int k = 0; k < HIT_BURST_COUNT && !particles.full(); k++)
+                particles.add(shipPos + randUnitVec() * randF(HIT_SPAWN_RADIUS_MIN, HIT_SPAWN_RADIUS_MAX),
+                              randUnitVec() * randF(HIT_SPEED_MIN, HIT_SPEED_MAX),
+                              randF(HIT_LIFE_MIN, HIT_LIFE_MAX), randF(HIT_SIZE_MIN, HIT_SIZE_MAX));
             for (auto& exp : shipHits)
                 particles.spawnExplosion(exp);
         }
