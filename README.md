@@ -1,57 +1,120 @@
 # Space Shooter 3D — INFO-H-502
 
-Jeu de vaisseau spatial en OpenGL où le joueur doit éviter des astéroïdes dans l'espace.  
-Projet réalisé dans le cadre du cours **INFO-H-502 – 3D Graphics** (ULB, 2025-2026).
+A 3D space shooter in OpenGL where the player must avoid asteroids in space.  
+Project made for the course **INFO-H-502 – 3D Graphics** (ULB, 2025-2026).
 
-## Auteur
+## Author
 
 DUMAN Louis-David
 
-## Compilation
+## Build
 
-### Prérequis
+### Requirements
 
 - CMake ≥ 3.16
-- Compilateur C++17 (GCC, Clang ou MSVC)
+- C++17 compiler (GCC, Clang or MSVC)
+- OpenGL, GLFW, GLAD (bundled in the repository)
 
-### Build
+### Steps
 
 ```bash
 git clone https://github.com/L6uis9/projet-info-h502.git
 cd projet-info-h502
 mkdir build && cd build
+cmake ..
 cmake --build .
 ```
 
-## Lancement
+## Running
 
+**Linux / macOS:**
 ```bash
 cd build
 ./SpaceGame
 ```
 
-## Contrôles
+**Windows:**
+```powershell
+cd build
+.\SpaceGame.exe
+```
 
-| Touche | Action |
+## Controls
+
+| Key | Action |
 |---|---|
-| `Z / W` | Avancer |
-| `S` | Regarder en arrière |
-| `Souris` | Orienter le vaisseau |
-| `Échap` | Quitter |
+| `Z / W` | Move forward |
+| `S` | Look backward |
+| `X` | Toggle spaceship refraction |
+| `Mouse` | Aim the spaceship |
+| `Escape` | Quit |
+
 ---
 
-## Features implémentées
+## Implemented Features
 
-### Basiques (obligatoires)
+### Basic
 
-### Intermédiaires
+- Lighting (ambient, diffuse, specular) - applied to all models (spaceship, Earth, asteroids) using star light sources
+- Textures - stone texture on asteroids with triplanar mapping, diffuse texture on the spaceship and Earth
+- Loading multiple models - spaceship, Earth (planet in the scene)
+- Cubemap - space environment skybox surrounding the entire scene
+- Game logic - player navigates and avoids asteroids, collisions trigger explosions, invicibility management when the spaceship get hit
+- Objects moving in the scene - asteroids continuously spawning and moving through the scene
+- Free navigation (camera control) - third-person camera locked behind the spaceship, steered by mouse
+- Reflection / Refraction - reflection applied to the spaceship when `X` is pressed, refraction applied to the spaceship's windows.
 
-### Avancées
+### Intermediate
 
-## Lien avec la théorie
+- Frame Buffer Object - motion blur applied to the whole scene during fast movement
+- Particles - engine fire trail while thrusting, burst explosions on asteroid and ship collisions
+- Billboarding - stars rendered as screen-aligned quads that always face the camera
 
-Chapitre choisi : **Chapitre 16**
+---
 
-## Structure du projet
+## Link with Theory
 
-## Vidéo de démonstration
+Chosen chapter: **Chapter 16** - *Procedural Fractal Terrain* - "Texturing and Modeling: A Procedural Approach" by D. Ebert et al.
+
+The project implements procedural fractal terrain generation for asteroids directly related to the techniques described in this chapter.
+
+---
+
+## Project Structure
+
+```
+projet-info-h502/
+├── src/              # C++ source code
+│   ├── main.cpp
+│   ├── camera.{cpp,h}
+│   ├── asteroid.{cpp,h}
+│   ├── model.{cpp,h}
+│   ├── particle.{cpp,h}
+│   ├── postprocess.{cpp,h}
+│   ├── skybox.{cpp,h}
+│   ├── star.{cpp,h}
+│   └── shader.{cpp,h}
+├── shaders/          # GLSL shaders
+│   ├── model.{vert,frag}
+│   ├── motionblur.{vert,frag}
+│   ├── particle.{vert,frag}
+│   ├── skybox.{vert,frag}
+│   └── star.{vert,frag}
+├── docs/
+│   └── Guidelines_project.pdf
+└── CMakeLists.txt
+```
+
+## Demo Video
+
+*(to be added)*
+
+---
+
+## Sources & References
+
+- [Cubemap image](https://www.eso.org/public/images/eso0932a/)
+- [Image to cubemap converter](https://jaxry.github.io/panorama-to-cubemap/)
+- [Asteroid texture](https://www.magnific.com/free-photo/photo-stone-texture-pattern_414764463.htm#fromView=keyword&page=1&position=0&uuid=52f9083a-e0f6-40a0-8ed2-776861b7fdff&query=Asteroid+texture)
+- [Earth object and texture](https://free3d.com/3d-model/earth-photorealistic-2k-927613.html)
+- [Spaceship object and texture](https://free3d.com/3d-model/e-45-aircraft-71823.html)

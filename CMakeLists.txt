@@ -33,7 +33,10 @@ target_sources(SpaceGame PRIVATE 3rdParty/glad/src/glad.c)
 
 # ── System libs ───────────────────────────────────────────────────────────────
 find_package(OpenGL REQUIRED)
-target_link_libraries(SpaceGame PRIVATE OpenGL::GL dl pthread)
+target_link_libraries(SpaceGame PRIVATE OpenGL::GL)
+if(UNIX)
+    target_link_libraries(SpaceGame PRIVATE dl pthread)
+endif()
 
 # ── Copy assets next to the binary so relative paths work ─────────────────────
 add_custom_command(TARGET SpaceGame POST_BUILD
