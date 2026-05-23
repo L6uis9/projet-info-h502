@@ -1,9 +1,13 @@
 #include "asteroid.h"
+#include "shader.h"
 
+#include <glad/glad.h>
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <cmath>
-#include <vector>
 #include <cstdlib>
+#include <vector>
 
 // Perlin gradient noise over R³  — introduced in "Texturing and Modeling", Ch.12, (p.344-347) needed for ridged multifractal in Ch.16
 
@@ -275,4 +279,145 @@ void Asteroid::generate(int seed, int rings, int sectors)
     mesh.indices = std::move(indices);
     mesh.material.Kd = { 0.52f, 0.48f, 0.44f };
     mesh.upload();
+}
+
+// Utilities for asteroid spawning and movement
+static float astRandF(float lo, float hi)
+{
+    return lo + (float)rand() / RAND_MAX * (hi - lo);
+}
+
+static glm::vec3 astRandUnitVec()
+{
+    float u     = astRandF(-1.f, 1.f);
+    float theta = astRandF(0.f, 2.f * glm::pi<float>());
+    float r     = std::sqrt(std::max(0.f, 1.f - u * u));
+    return { r * std::cos(theta), u, r * std::sin(theta) };
+}
+
+void AsteroidSystem::init(const AsteroidSpawnCfg& cfg, GLuint texture)
+{
+    cfg_ = cfg;
+    pool.resize(cfg.poolSize);
+    for (int i = 0; i < cfg.poolSize; i++) {
+        pool[i].generate(i);
+        pool[i].mesh.material.diffuseTexture = texture;
+        pool[i].mesh.material.hasDiffuse     = true;
+    }
+}
+
+void AsteroidSystem::trySpawn(float currentFrame, glm::vec3 shipPos)
+{
+    if (currentFrame < nextSpawnTime) return;
+    if ((int)instances.size() >= cfg_.maxCount) return;
+    nextSpawnTime = currentFrame + cfg_.spawnInterval;
+
+    float spawnDist   = astRandF(cfg_.minSpawnRadius, cfg_.maxSpawnRadius);
+    glm::vec3 spawnPos = shipPos + astRandUnitVec() * spawnDist;
+
+    glm::vec3 dir = (astRandF(0.f, 1.f) < cfg_.towardShipProba)
+                    ? glm::normalize(shipPos - spawnPos)
+                    : astRandUnitVec();
+
+    AsteroidInstance inst;
+    inst.meshIdx  = rand() % cfg_.poolSize;
+    inst.position = spawnPos;
+    inst.velocity = dir * astRandF(cfg_.minSpeed, cfg_.maxSpeed);
+    inst.scale    = astRandF(cfg_.minScale, cfg_.maxScale);
+    inst.rotSpeed = astRandF(5.f, 30.f);
+    inst.rotAxis  = astRandUnitVec();
+    inst.rotAngle = astRandF(0.f, 360.f);
+    instances.push_back(inst);
+}
+
+std::vector<AsteroidExplosion> AsteroidSystem::update(float dt, glm::vec3 shipPos)
+{
+    for (auto& a : instances)
+        a.position += a.velocity * dt;
+
+    instances.erase(
+        std::remove_if(instances.begin(), instances.end(),
+            [&](const AsteroidInstance& a) {
+                return glm::length(a.position - shipPos) > cfg_.despawnDist;
+            }),
+        instances.end());
+
+    std::vector<bool>             explode(instances.size(), false);
+    std::vector<AsteroidExplosion> explosions;
+
+    for (int i = 0; i < (int)instances.size(); i++)
+        for (int j = i + 1; j < (int)instances.size(); j++)
+            if (glm::length(instances[i].position - instances[j].position)
+                    < instances[i].scale + instances[j].scale) {
+                explode[i] = true;
+                explode[j] = true;
+            }
+
+    std::vector<AsteroidInstance> survivors;
+    survivors.reserve(instances.size());
+    for (int i = 0; i < (int)instances.size(); i++) {
+        if (explode[i])
+            explosions.push_back({ instances[i].position, instances[i].scale });
+        else
+            survivors.push_back(instances[i]);
+    }
+    instances = std::move(survivors);
+    return explosions;
+}
+
+bool AsteroidSystem::checkShipCollision(glm::vec3 shipPos, float shipRadius,
+                                         float currentFrame, float& invincibleUntil,
+                                         float invincibilityDur,
+                                         std::vector<AsteroidExplosion>& out)
+{
+    if (currentFrame <= invincibleUntil) return false;
+
+    std::vector<bool> hit(instances.size(), false);
+    bool anyHit = false;
+    for (int i = 0; i < (int)instances.size(); i++) {
+        if (glm::length(instances[i].position - shipPos) < shipRadius + instances[i].scale) {
+            hit[i] = true;
+            anyHit = true;
+        }
+    }
+    if (!anyHit) return false;
+
+    invincibleUntil = currentFrame + invincibilityDur;
+    std::vector<AsteroidInstance> survivors;
+    survivors.reserve(instances.size());
+    for (int i = 0; i < (int)instances.size(); i++) {
+        if (hit[i])
+            out.push_back({ instances[i].position, instances[i].scale });
+        else
+            survivors.push_back(instances[i]);
+    }
+    instances = std::move(survivors);
+    return true;
+}
+
+void AsteroidSystem::draw(Shader& shader, float currentFrame) const
+{
+    shader.setBool("useTriplanar", true);
+    for (auto& inst : instances) {
+        glm::mat4 am = glm::mat4(1.f);
+        am = glm::translate(am, inst.position);
+        am = glm::rotate(am, glm::radians(inst.rotAngle + inst.rotSpeed * currentFrame),
+                         inst.rotAxis);
+        am = glm::scale(am, glm::vec3(inst.scale));
+
+        const Mesh& amesh = pool[inst.meshIdx].mesh;
+        shader.setMat4("model",      am);
+        shader.setBool("hasDiffuse", amesh.material.hasDiffuse);
+        shader.setVec3("matKd",      amesh.material.Kd);
+        if (amesh.material.hasDiffuse) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, amesh.material.diffuseTexture);
+        }
+        amesh.draw();
+    }
+}
+
+void AsteroidSystem::free()
+{
+    for (auto& a : pool) a.free();
 }

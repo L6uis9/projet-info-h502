@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -14,6 +15,7 @@
 #include "skybox.h"
 #include "camera.h"
 #include "asteroid.h"
+#include "particle.h"
 #include "textureLoader.h"
 
 // Window settings
@@ -35,8 +37,8 @@ static const int   ASTEROID_MAX_COUNT      = 200;
 static const float ASTEROID_TOWARD_SHIP_PROBA = 0.2f;
 
 // Ship collision settings
-static const float SHIP_RADIUS       = 1.5f;  // approximate sphere radius
-static const float SHIP_INVINCIBILITY = 2.0f; // seconds of invincibility after being hit
+static const float SHIP_RADIUS        = 1.5f;
+static const float SHIP_INVINCIBILITY = 2.0f;
 
 // Ship physics settings
 static const float SHIP_ACCEL = 50.f;
@@ -129,7 +131,7 @@ int main()
     glfwSetCursorPosCallback(window,       cursor_pos_cb);
     glfwSetScrollCallback(window,          scroll_cb);
     glfwSetKeyCallback(window,             key_cb);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // capture mouse
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Init GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -141,28 +143,24 @@ int main()
     glEnable(GL_PROGRAM_POINT_SIZE);
 
     // Shaders
-    Shader modelShader   ("shaders/model.vert",    "shaders/model.frag");
-    Shader skyboxShader  ("shaders/skybox.vert",   "shaders/skybox.frag");
-    Shader starShader    ("shaders/star.vert",     "shaders/star.frag");
-    Shader particleShader  ("shaders/particle.vert",   "shaders/particle.frag");
-    Shader motionBlurShader("shaders/motionblur.vert", "shaders/motionblur.frag");
+    Shader modelShader    ("shaders/model.vert",      "shaders/model.frag");
+    Shader skyboxShader   ("shaders/skybox.vert",     "shaders/skybox.frag");
+    Shader starShader     ("shaders/star.vert",       "shaders/star.frag");
+    Shader particleShader ("shaders/particle.vert",   "shaders/particle.frag");
+    Shader motionBlurShader("shaders/motionblur.vert","shaders/motionblur.frag");
 
     // Skybox
     // px=right, nx=left, py=top, ny=bottom, pz=front, nz=back
     Skybox skybox;
     skybox.load({
-        "assets/cubemap/px.png",
-        "assets/cubemap/nx.png",
-        "assets/cubemap/py.png",
-        "assets/cubemap/ny.png",
-        "assets/cubemap/pz.png",
-        "assets/cubemap/nz.png"
+        "assets/cubemap/px.png", "assets/cubemap/nx.png",
+        "assets/cubemap/py.png", "assets/cubemap/ny.png",
+        "assets/cubemap/pz.png", "assets/cubemap/nz.png"
     });
 
     // Spaceship model
     Model spaceship;
-    spaceship.load("assets/models/spaceship.obj",
-                   "assets/textures/spaceship");
+    spaceship.load("assets/models/spaceship.obj", "assets/textures/spaceship");
 
     // Earth planet
     Model earth;
@@ -170,31 +168,30 @@ int main()
     static const glm::vec3 EARTH_POS   = {0.f, -50.f, -700.f};
     static const float     EARTH_SCALE = 50.f;
 
-    // Asteroid texture and mesh pool (pre-generated to avoid runtime cost)
-    GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
-
-    std::vector<Asteroid> asteroidPool(ASTEROID_MESH_POOL);
-    for (int i = 0; i < ASTEROID_MESH_POOL; i++) {
-        asteroidPool[i].generate(i);
-        asteroidPool[i].mesh.material.diffuseTexture = asteroidTex;
-        asteroidPool[i].mesh.material.hasDiffuse     = true;
-    }
-
-    struct AsteroidInstance {
-        int       meshIdx;
-        glm::vec3 position;
-        glm::vec3 velocity;
-        float     scale;
-        float     rotSpeed;
-        glm::vec3 rotAxis;
-        float     rotAngle; // initial phase offset (degrees)
-    };
-
-    std::vector<AsteroidInstance> asteroids;
-    float nextSpawnTime = 0.f;
-
+    // Asteroid system
     srand(42);
+    AsteroidSpawnCfg astCfg;
+    astCfg.poolSize        = ASTEROID_MESH_POOL;
+    astCfg.minSpawnRadius  = ASTEROID_MIN_SPAWN_RADIUS;
+    astCfg.maxSpawnRadius  = ASTEROID_SPAWN_RADIUS;
+    astCfg.despawnDist     = ASTEROID_DESPAWN_DIST;
+    astCfg.minScale        = ASTEROID_MIN_SCALE;
+    astCfg.maxScale        = ASTEROID_MAX_SCALE;
+    astCfg.minSpeed        = ASTEROID_MIN_SPEED;
+    astCfg.maxSpeed        = ASTEROID_MAX_SPEED;
+    astCfg.spawnInterval   = ASTEROID_SPAWN_INTERVAL;
+    astCfg.maxCount        = ASTEROID_MAX_COUNT;
+    astCfg.towardShipProba = ASTEROID_TOWARD_SHIP_PROBA;
 
+    GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
+    AsteroidSystem asteroids;
+    asteroids.init(astCfg, asteroidTex);
+
+    // Particle system
+    ParticleSystem particles;
+    particles.init();
+
+    // Helpers used for fire trail / explosion particle placement
     auto randF = [](float lo, float hi) -> float {
         return lo + (float)rand() / RAND_MAX * (hi - lo);
     };
@@ -204,36 +201,22 @@ int main()
         float r     = std::sqrt(std::max(0.f, 1.f - u * u));
         return { r * std::cos(theta), u, r * std::sin(theta) };
     };
-
-    auto spawnAsteroid = [&]() {
-        if ((int)asteroids.size() >= ASTEROID_MAX_COUNT) return;
-
-        float spawnDist = randF(ASTEROID_MIN_SPAWN_RADIUS, ASTEROID_SPAWN_RADIUS);
-        glm::vec3 spawnPos = shipPos + randUnitVec() * spawnDist;
-
-        glm::vec3 dir = (randF(0.f, 1.f) < ASTEROID_TOWARD_SHIP_PROBA)
-                        ? glm::normalize(shipPos - spawnPos)
-                        : randUnitVec();
-
-        AsteroidInstance inst;
-        inst.meshIdx  = rand() % ASTEROID_MESH_POOL;
-        inst.position = spawnPos;
-        inst.velocity = dir * randF(ASTEROID_MIN_SPEED, ASTEROID_MAX_SPEED);
-        inst.scale    = randF(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
-        inst.rotSpeed = randF(5.f, 30.f);
-        inst.rotAxis  = randUnitVec();
-        inst.rotAngle = randF(0.f, 360.f);
-        asteroids.push_back(inst);
+    auto spawnExplosion = [&](const AsteroidExplosion& exp) {
+        int count = 15 + (int)(exp.scale * 5.f);
+        for (int k = 0; k < count && !particles.full(); k++)
+            particles.add(exp.center + randUnitVec() * exp.scale * 0.4f,
+                          randUnitVec() * randF(4.f, 18.f),
+                          randF(0.5f, 1.2f), randF(8.f, 18.f));
     };
 
     // Pre-configure skybox shader sampler
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
-    // All stars: single source of truth for both lighting and visual rendering
+    // Sun data shared between lighting (modelShader) and visual rendering (starShader)
     struct VisualStar { glm::vec3 dir; glm::vec3 color; float radius; };
     const std::vector<VisualStar> visualStars = {
-        { glm::normalize(glm::vec3( 4000.f,  1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f }, // sun
+        { glm::normalize(glm::vec3(4000.f, 1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f },
     };
 
     // Pre-configure model shader
@@ -262,40 +245,6 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glBindVertexArray(0);
-
-    // Fire trail particle system
-    struct Particle {
-        glm::vec3 pos;
-        glm::vec3 vel;
-        float     life;     // remaining seconds
-        float     maxLife;
-        float     size;
-    };
-
-    static const int   MAX_PT    = 500;
-    static const float PT_RATE   = 100.f; // particles per second
-
-    // Asteroid trail particle system
-
-    std::vector<Particle> particles;
-    particles.reserve(MAX_PT);
-    float ptSpawnAccum = 0.f;
-
-    // GPU buffer layout: [vec3 pos | vec4 color | float size] = 8 floats
-    GLuint ptVAO, ptVBO;
-    glGenVertexArrays(1, &ptVAO);
-    glGenBuffers(1, &ptVBO);
-    glBindVertexArray(ptVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
-    glBufferData(GL_ARRAY_BUFFER, MAX_PT * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(7 * sizeof(float)));
-    glBindVertexArray(0);
-
 
     // FBO for motion blur post-process
     int fboW, fboH;
@@ -346,8 +295,8 @@ int main()
     {
         // Timing
         float currentFrame = (float)glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        deltaTime  = currentFrame - lastFrame;
+        lastFrame  = currentFrame;
 
         // Input
         glfwPollEvents();
@@ -355,163 +304,53 @@ int main()
         processInput(window);
 
         // Debug title
-        
         {
             char title[128];
-            float speed = glm::length(shipVelocity);
             snprintf(title, sizeof(title),
                 "Space Game | spd: %.1f  pos: (%.1f, %.1f, %.1f)",
-                speed, shipPos.x, shipPos.y, shipPos.z);
+                glm::length(shipVelocity), shipPos.x, shipPos.y, shipPos.z);
             glfwSetWindowTitle(window, title);
         }
-        
 
         // Fire trail: spawn particles when thrusting
         bool thrusting = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
                          glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
         if (thrusting) {
-            ptSpawnAccum += PT_RATE * deltaTime;
-            int toSpawn = (int)ptSpawnAccum;
-            ptSpawnAccum -= (float)toSpawn;
+            particles.spawnAccum += ParticleSystem::SPAWN_RATE * deltaTime;
+            int toSpawn = (int)particles.spawnAccum;
+            particles.spawnAccum -= (float)toSpawn;
 
             glm::vec3 back  = -camera.front;
             glm::vec3 right = glm::normalize(glm::cross(camera.front, glm::vec3(0.f, 1.f, 0.f)));
             glm::vec3 up    = glm::cross(right, camera.front);
 
-            for (int i = 0; i < toSpawn && (int)particles.size() < MAX_PT; ++i) {
-                Particle p;
-                p.pos     = shipPos + back * 1.2f
-                          + right * randF(-0.45f, 0.45f)
-                          + up    * randF(-0.5f, 0.5f);
-                p.vel     = back  * randF(8.f, 16.f)
-                          + right * randF(-1.5f, 1.5f)
-                          + up    * randF(-1.f,  1.f);
-                p.maxLife = randF(0.2f, 0.35f);
-                p.life    = p.maxLife;
-                p.size    = randF(4.f, 8.f);
-                particles.push_back(p);
-            }
+            for (int i = 0; i < toSpawn && !particles.full(); ++i)
+                particles.add(
+                    shipPos + back * 1.2f + right * randF(-0.45f, 0.45f) + up * randF(-0.5f, 0.5f),
+                    back * randF(8.f, 16.f) + right * randF(-1.5f, 1.5f) + up * randF(-1.f, 1.f),
+                    randF(0.2f, 0.35f), randF(4.f, 8.f));
         }
 
-        // Update fire particles
-        for (auto& p : particles) {
-            p.pos  += p.vel * deltaTime;
-            p.vel  *= (1.f - 3.f * deltaTime); // drag
-            p.life -= deltaTime;
-        }
-        particles.erase(
-            std::remove_if(particles.begin(), particles.end(),
-                [](const Particle& p){ return p.life <= 0.f; }),
-            particles.end());
+        particles.update(deltaTime);
 
-        // Spawn new asteroids
-        if (currentFrame >= nextSpawnTime) {
-            spawnAsteroid();
-            nextSpawnTime = currentFrame + ASTEROID_SPAWN_INTERVAL;
-        }
+        // Asteroid system update
+        asteroids.trySpawn(currentFrame, shipPos);
+        for (auto& exp : asteroids.update(deltaTime, shipPos))
+            spawnExplosion(exp);
 
-        // Move asteroids and remove those too far from the ship
-        for (auto& a : asteroids) {
-            a.position += a.velocity * deltaTime;
-
+        // Ship collision
+        std::vector<AsteroidExplosion> shipHits;
+        if (asteroids.checkShipCollision(shipPos, SHIP_RADIUS, currentFrame,
+                                          shipInvincibleUntil, SHIP_INVINCIBILITY, shipHits)) {
+            for (int k = 0; k < 50 && !particles.full(); k++)
+                particles.add(shipPos + randUnitVec() * randF(0.2f, 1.5f),
+                              randUnitVec() * randF(8.f, 28.f),
+                              randF(0.7f, 1.8f), randF(12.f, 24.f));
+            for (auto& exp : shipHits)
+                spawnExplosion(exp);
         }
 
-
-        asteroids.erase(
-            std::remove_if(asteroids.begin(), asteroids.end(),
-                [&](const AsteroidInstance& a) {
-                    return glm::length(a.position - shipPos) > ASTEROID_DESPAWN_DIST;
-                }),
-            asteroids.end()
-        );
-
-        // Asteroid-asteroid sphere collision detection
-        {
-            std::vector<bool> explode(asteroids.size(), false);
-            for (int i = 0; i < (int)asteroids.size(); i++) {
-                for (int j = i + 1; j < (int)asteroids.size(); j++) {
-                    float dist    = glm::length(asteroids[i].position - asteroids[j].position);
-                    float radSum  = asteroids[i].scale + asteroids[j].scale;
-                    if (dist < radSum) {
-                        explode[i] = true;
-                        explode[j] = true;
-                    }
-                }
-            }
-            for (int i = 0; i < (int)asteroids.size(); i++) {
-                if (!explode[i]) continue;
-                glm::vec3 center = asteroids[i].position;
-                int count = 15 + (int)(asteroids[i].scale * 5.f);
-                for (int k = 0; k < count && (int)particles.size() < MAX_PT; k++) {
-                    Particle p;
-                    p.pos     = center + randUnitVec() * asteroids[i].scale * 0.4f;
-                    p.vel     = randUnitVec() * randF(4.f, 18.f);
-                    p.maxLife = randF(0.5f, 1.2f);
-                    p.life    = p.maxLife;
-                    p.size    = randF(8.f, 18.f);
-                    particles.push_back(p);
-                }
-            }
-            std::vector<AsteroidInstance> survivors;
-            survivors.reserve(asteroids.size());
-            for (int i = 0; i < (int)asteroids.size(); i++) {
-                if (!explode[i]) survivors.push_back(asteroids[i]);
-            }
-            asteroids = std::move(survivors);
-        }
-
-        // Asteroid-ship sphere collision detection
-        if (currentFrame > shipInvincibleUntil) {
-            std::vector<bool> hitShip(asteroids.size(), false);
-            for (int i = 0; i < (int)asteroids.size(); i++) {
-                float dist = glm::length(asteroids[i].position - shipPos);
-                if (dist < SHIP_RADIUS + asteroids[i].scale)
-                    hitShip[i] = true;
-            }
-
-            bool anyHit = false;
-            for (int i = 0; i < (int)asteroids.size(); i++) {
-                if (!hitShip[i]) continue;
-                anyHit = true;
-
-                // Explosion centred on the ship
-                int shipCount = 50;
-                for (int k = 0; k < shipCount && (int)particles.size() < MAX_PT; k++) {
-                    Particle p;
-                    p.pos     = shipPos + randUnitVec() * randF(0.2f, 1.5f);
-                    p.vel     = randUnitVec() * randF(8.f, 28.f);
-                    p.maxLife = randF(0.7f, 1.8f);
-                    p.life    = p.maxLife;
-                    p.size    = randF(12.f, 24.f);
-                    particles.push_back(p);
-                }
-
-                // Explosion centred on the asteroid
-                glm::vec3 astCenter = asteroids[i].position;
-                int astCount = 15 + (int)(asteroids[i].scale * 5.f);
-                for (int k = 0; k < astCount && (int)particles.size() < MAX_PT; k++) {
-                    Particle p;
-                    p.pos     = astCenter + randUnitVec() * asteroids[i].scale * 0.4f;
-                    p.vel     = randUnitVec() * randF(4.f, 18.f);
-                    p.maxLife = randF(0.5f, 1.2f);
-                    p.life    = p.maxLife;
-                    p.size    = randF(8.f, 18.f);
-                    particles.push_back(p);
-                }
-            }
-
-            if (anyHit) {
-                shipInvincibleUntil = currentFrame + SHIP_INVINCIBILITY;
-                std::vector<AsteroidInstance> survivors;
-                survivors.reserve(asteroids.size());
-                for (int i = 0; i < (int)asteroids.size(); i++) {
-                    if (!hitShip[i]) survivors.push_back(asteroids[i]);
-                }
-                asteroids = std::move(survivors);
-            }
-        }
-
-        // Render scene into off-screen FBO (for motion blur post-process)
+        // Render scene into off-screen FBO
         glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
         glViewport(0, 0, fboW, fboH);
         glClearColor(0.01f, 0.01f, 0.02f, 1.f);
@@ -528,7 +367,7 @@ int main()
                                            glm::vec3(0.f, 1.f, 0.f));
         glm::mat4 projection = camera.projMatrix(aspect);
 
-        // Draw spaceship (blink during invincibility frames)
+        // Draw spaceship (blink during invincibility)
         bool drawShip = (currentFrame > shipInvincibleUntil) ||
                         (fmod(currentFrame * 8.f, 1.f) < 0.5f);
 
@@ -538,8 +377,8 @@ int main()
         glm::mat4 model = glm::mat4(1.f);
         model = glm::translate(model, shipPos);
         model = glm::rotate(model, glm::radians(-camera.yaw),   glm::vec3(0.f, 1.f, 0.f));
-        model = glm::rotate(model, glm::radians(-90.f),         glm::vec3(0.f, 1.f, 0.f));  // fix model orientation
-        model = glm::rotate(model, glm::radians(camera.pitch),  glm::vec3(1.f, 0.f, 0.f));  // pitch from mouse
+        model = glm::rotate(model, glm::radians(-90.f),         glm::vec3(0.f, 1.f, 0.f));
+        model = glm::rotate(model, glm::radians(camera.pitch),  glm::vec3(1.f, 0.f, 0.f));
         model = glm::scale(model, glm::vec3(0.75f));
 
         modelShader.setMat4("model",      model);
@@ -567,7 +406,7 @@ int main()
         modelShader.setBool("reflective", false);
         modelShader.setBool("refractive", false);
 
-        // Draw Earth planet
+        // Draw Earth
         modelShader.setBool("useTriplanar", false);
         {
             glm::mat4 em = glm::mat4(1.f);
@@ -576,7 +415,6 @@ int main()
             em = glm::scale(em, glm::vec3(EARTH_SCALE));
             modelShader.setMat4("model", em);
 
-            // Earth surface
             for (auto& mesh : earth.meshes) {
                 if (mesh.material.name != "Earth") continue;
                 modelShader.setBool("hasDiffuse", mesh.material.hasDiffuse);
@@ -588,7 +426,6 @@ int main()
                 mesh.draw();
             }
 
-            // Clouds
             glDepthMask(GL_FALSE);
             glBlendFunc(GL_ONE, GL_ONE);
             for (auto& mesh : earth.meshes) {
@@ -606,28 +443,10 @@ int main()
         }
 
         // Draw asteroids
-        modelShader.setBool("useTriplanar", true);
-        for (auto& inst : asteroids) {
-            glm::mat4 am = glm::mat4(1.f);
-            am = glm::translate(am, inst.position);
-            am = glm::rotate(am, glm::radians(inst.rotAngle + inst.rotSpeed * currentFrame),
-                             inst.rotAxis);
-            am = glm::scale(am, glm::vec3(inst.scale));
-
-            Mesh& amesh = asteroidPool[inst.meshIdx].mesh;
-            modelShader.setMat4("model",     am);
-            modelShader.setBool("hasDiffuse", amesh.material.hasDiffuse);
-            modelShader.setVec3("matKd",      amesh.material.Kd);
-            if (amesh.material.hasDiffuse) {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, amesh.material.diffuseTexture);
-            }
-            amesh.draw();
-        }
+        asteroids.draw(modelShader, currentFrame);
 
         // Draw skybox
         skyboxShader.use();
-        // Strip translation from view so the skybox never moves
         glm::mat4 skyView = glm::mat4(glm::mat3(view));
         skyboxShader.setMat4("view",       skyView);
         skyboxShader.setMat4("projection", projection);
@@ -636,47 +455,9 @@ int main()
         skybox.draw();
 
         // Draw fire trail particles
-        if (!particles.empty()) {
-            std::vector<float> gpuBuf;
-            gpuBuf.reserve(particles.size() * 8);
-            for (auto& p : particles) {
-                float t = p.life / p.maxLife; // 1=fresh, 0=dead
-                glm::vec3 col;
-                float alpha;
-                if (t > 0.5f) {
-                    float u = (t - 0.5f) * 2.f;
-                    col   = glm::mix(glm::vec3(1.f, 0.4f, 0.f), glm::vec3(1.f, 0.92f, 0.4f), u);
-                    alpha = glm::mix(0.5f, 0.65f, u);
-                } else {
-                    float u = t * 2.f;
-                    col   = glm::mix(glm::vec3(0.25f, 0.f, 0.f), glm::vec3(1.f, 0.4f, 0.f), u);
-                    alpha = u * 0.5f;
-                }
-                float sz = p.size * t;
-                gpuBuf.push_back(p.pos.x); gpuBuf.push_back(p.pos.y); gpuBuf.push_back(p.pos.z);
-                gpuBuf.push_back(col.r);   gpuBuf.push_back(col.g);   gpuBuf.push_back(col.b);
-                gpuBuf.push_back(alpha);
-                gpuBuf.push_back(sz);
-            }
-            glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0,
-                            (GLsizeiptr)(gpuBuf.size() * sizeof(float)), gpuBuf.data());
+        particles.draw(view, projection, particleShader);
 
-            particleShader.use();
-            particleShader.setMat4("view",       view);
-            particleShader.setMat4("projection", projection);
-
-            glDepthMask(GL_FALSE);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow
-            glBindVertexArray(ptVAO);
-            glDrawArrays(GL_POINTS, 0, (GLsizei)particles.size());
-            glBindVertexArray(0);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            glDepthMask(GL_TRUE);
-        }
-
-
-        // Draw stars (billboards at "infinity")
+        // Draw sun (billboard at "infinity")
         glDepthFunc(GL_LEQUAL);
         starShader.use();
         starShader.setMat4("view",       view);
@@ -700,8 +481,7 @@ int main()
             glDisable(GL_DEPTH_TEST);
             glDisable(GL_BLEND);
 
-            float speed = glm::length(shipVelocity);
-            float blurStrength = glm::clamp(speed / 100.f, 0.f, 1.f) * 0.08f;
+            float blurStrength = glm::clamp(glm::length(shipVelocity) / 100.f, 0.f, 1.f) * 0.08f;
 
             motionBlurShader.use();
             motionBlurShader.setInt  ("screenTexture", 0);
@@ -721,18 +501,17 @@ int main()
     }
 
     // Cleanup
+    particles.free();
+    asteroids.free();
     glDeleteFramebuffers(1, &sceneFBO);
     glDeleteTextures(1, &sceneColorTex);
     glDeleteRenderbuffers(1, &sceneDepthRBO);
     glDeleteVertexArrays(1, &quadVAO);
     glDeleteBuffers(1, &quadVBO);
     glDeleteBuffers(1, &quadEBO);
-    glDeleteVertexArrays(1, &ptVAO);
-    glDeleteBuffers(1, &ptVBO);
     glDeleteVertexArrays(1, &sunVAO);
     glDeleteBuffers(1, &sunVBO);
     glDeleteBuffers(1, &sunEBO);
-    for (auto& a : asteroidPool) a.free();
     spaceship.free();
     earth.free();
     skybox.free();
