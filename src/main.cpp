@@ -19,6 +19,7 @@
 #include "textureLoader.h"
 #include "utils.h"
 #include "postprocess.h"
+#include "star.h"
 
 // Window settings
 static const int   SCR_W  = 1280;
@@ -198,9 +199,7 @@ int main()
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
-    // Sun data shared between lighting (modelShader) and visual rendering (starShader)
-    struct VisualStar { glm::vec3 dir; glm::vec3 color; float radius; };
-    const std::vector<VisualStar> visualStars = {
+    const std::vector<StarEntry> visualStars = {
         { glm::normalize(glm::vec3(4000.f, 1500.f, -2000.f)), glm::vec3(1.00f, 0.80f, 0.50f), 0.18f },
     };
 
@@ -215,21 +214,8 @@ int main()
         modelShader.setVec3("starColors[" + std::to_string(i) + "]", visualStars[i].color);
     }
 
-    // Sun billboard quad
-    const float sunQuad[] = { -0.5f,-0.5f,  0.5f,-0.5f,  0.5f, 0.5f,  -0.5f, 0.5f };
-    const unsigned int sunIdx[] = { 0,1,2, 0,2,3 };
-    GLuint sunVAO, sunVBO, sunEBO;
-    glGenVertexArrays(1, &sunVAO);
-    glGenBuffers(1, &sunVBO);
-    glGenBuffers(1, &sunEBO);
-    glBindVertexArray(sunVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(sunQuad), sunQuad, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(sunIdx), sunIdx, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glBindVertexArray(0);
+    Star sunBillboard;
+    sunBillboard.init();
 
     int fboW, fboH;
     glfwGetFramebufferSize(window, &fboW, &fboH);
@@ -399,20 +385,8 @@ int main()
         // Draw fire trail particles
         particles.draw(view, projection, particleShader);
 
-        // Draw sun (billboard at "infinity")
-        glDepthFunc(GL_LEQUAL);
-        starShader.use();
-        starShader.setMat4("view",       view);
-        starShader.setMat4("projection", projection);
-        glBindVertexArray(sunVAO);
-        for (auto& vs : visualStars) {
-            starShader.setVec3 ("sunDir",    vs.dir);
-            starShader.setFloat("sunRadius", vs.radius);
-            starShader.setVec3 ("starColor", vs.color);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        }
-        glBindVertexArray(0);
-        glDepthFunc(GL_LESS);
+        // Draw sun at infinity using a billboard (always faces camera)
+        sunBillboard.draw(starShader, view, projection, visualStars);
 
         float blurStrength = glm::clamp(glm::length(shipVelocity) / 100.f, 0.f, 1.f) * 0.08f;
         postProcess.apply(motionBlurShader, blurStrength);
@@ -424,9 +398,7 @@ int main()
     particles.free();
     asteroids.free();
     postProcess.free();
-    glDeleteVertexArrays(1, &sunVAO);
-    glDeleteBuffers(1, &sunVBO);
-    glDeleteBuffers(1, &sunEBO);
+    sunBillboard.free();
     spaceship.free();
     earth.free();
     skybox.free();
