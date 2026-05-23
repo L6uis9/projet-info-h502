@@ -631,7 +631,6 @@ int main()
         glm::mat4 skyView = glm::mat4(glm::mat3(view));
         skyboxShader.setMat4("view",       skyView);
         skyboxShader.setMat4("projection", projection);
-        skyboxShader.setInt ("skybox", 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
         skybox.draw();
@@ -666,7 +665,6 @@ int main()
             particleShader.use();
             particleShader.setMat4("view",       view);
             particleShader.setMat4("projection", projection);
-            particleShader.setBool("isPoint",    true);
 
             glDepthMask(GL_FALSE);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow
