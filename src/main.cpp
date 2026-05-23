@@ -171,18 +171,19 @@ int main()
 
     // Asteroid system
     srand(42);
-    AsteroidSpawnCfg astCfg;
-    astCfg.poolSize        = ASTEROID_MESH_POOL;
-    astCfg.minSpawnRadius  = ASTEROID_MIN_SPAWN_RADIUS;
-    astCfg.maxSpawnRadius  = ASTEROID_SPAWN_RADIUS;
-    astCfg.despawnDist     = ASTEROID_DESPAWN_DIST;
-    astCfg.minScale        = ASTEROID_MIN_SCALE;
-    astCfg.maxScale        = ASTEROID_MAX_SCALE;
-    astCfg.minSpeed        = ASTEROID_MIN_SPEED;
-    astCfg.maxSpeed        = ASTEROID_MAX_SPEED;
-    astCfg.spawnInterval   = ASTEROID_SPAWN_INTERVAL;
-    astCfg.maxCount        = ASTEROID_MAX_COUNT;
-    astCfg.towardShipProba = ASTEROID_TOWARD_SHIP_PROBA;
+    AsteroidSpawnCfg astCfg {
+        ASTEROID_MESH_POOL,
+        ASTEROID_MIN_SPAWN_RADIUS,
+        ASTEROID_SPAWN_RADIUS,
+        ASTEROID_DESPAWN_DIST,
+        ASTEROID_MIN_SCALE,
+        ASTEROID_MAX_SCALE,
+        ASTEROID_MIN_SPEED,
+        ASTEROID_MAX_SPEED,
+        ASTEROID_SPAWN_INTERVAL,
+        ASTEROID_MAX_COUNT,
+        ASTEROID_TOWARD_SHIP_PROBA,
+    };
 
     GLuint asteroidTex = loadTexture("assets/textures/asteroid/photo-stone-texture-pattern.jpg");
     AsteroidSystem asteroids;
