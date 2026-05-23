@@ -70,6 +70,11 @@ cd build
 - Particles - engine fire trail while thrusting, burst explosions on asteroid and ship collisions
 - Billboarding - stars rendered as screen-aligned quads that always face the camera
 
+### Advanced
+
+- Collision Detection - sphere-based collision detection between the spaceship and asteroids, handled manually without external physics library
+- 3D Mesh Loading from File - OBJ + MTL format parsed by hand, supporting vertices, normals, UV coordinates, and material textures
+
 ---
 
 ## Link with Theory
