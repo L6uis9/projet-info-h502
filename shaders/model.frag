@@ -68,13 +68,13 @@ void main()
     for (int i = 0; i < numStars; i++) {
         // Diffuse
         float NdotL    = dot(norm, starDirs[i]);
-        float diff     = smoothstep(-0.05, 0.1, NdotL);
+        float diff     = max(0.0, NdotL);
         vec3  lightCol = mix(vec3(1.0), starColors[i], 0.4);
         vec3  diffuse  = lightCol * diff * baseColor;
 
-        // Specular (Blinn-Phong)
-        vec3  halfway  = normalize(starDirs[i] + viewDir);
-        float spec     = pow(max(dot(norm, halfway), 0.0), 32.0);
+        // Specular (Phong)
+        vec3  R        = reflect(-starDirs[i], norm);
+        float spec     = pow(max(dot(R, viewDir), 0.0), 32.0);
         vec3  specular = lightCol * spec * 0.4;
 
         result += diffuse + specular;

@@ -10,17 +10,33 @@ void ParticleSystem::init()
 {
     particles.reserve(MAX_PARTICLES);
 
+    static const float quadVerts[18] = {
+        -1.f, -1.f, 0.f,   1.f, -1.f, 0.f,  -1.f,  1.f, 0.f,
+         1.f, -1.f, 0.f,   1.f,  1.f, 0.f,  -1.f,  1.f, 0.f
+    };
+
     glGenVertexArrays(1, &ptVAO);
+    glGenBuffers(1, &ptQuadVBO);
     glGenBuffers(1, &ptVBO);
     glBindVertexArray(ptVAO);
+
+    // Quad corners
+    glBindBuffer(GL_ARRAY_BUFFER, ptQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribDivisor(0, 0);
+
+    // particle i:  px py pz sz  r g b a (center + size, color)
     glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
     glBufferData(GL_ARRAY_BUFFER, MAX_PARTICLES * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glVertexAttribDivisor(1, 1);
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(7 * sizeof(float)));
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
+    glVertexAttribDivisor(2, 1);
+
     glBindVertexArray(0);
 }
 
@@ -62,25 +78,31 @@ void ParticleSystem::draw(const glm::mat4& view, const glm::mat4& projection, Sh
             col   = glm::mix(glm::vec3(0.25f, 0.f, 0.f), glm::vec3(1.f, 0.4f, 0.f), u);
             alpha = u * 0.5f;
         }
-        float sz = p.size * t;
+        float sz = p.size * t * 0.05f;  // converts size to world units
+        // Layout: center(xyz + w=size), col(rgba)
         gpuBuf.push_back(p.pos.x); gpuBuf.push_back(p.pos.y); gpuBuf.push_back(p.pos.z);
+        gpuBuf.push_back(sz);
         gpuBuf.push_back(col.r);   gpuBuf.push_back(col.g);   gpuBuf.push_back(col.b);
         gpuBuf.push_back(alpha);
-        gpuBuf.push_back(sz);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, ptVBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0,
                     (GLsizeiptr)(gpuBuf.size() * sizeof(float)), gpuBuf.data());
 
+    glm::vec3 cameraRight(view[0][0], view[1][0], view[2][0]);
+    glm::vec3 cameraUp   (view[0][1], view[1][1], view[2][1]);
+
     shader.use();
-    shader.setMat4("view",       view);
-    shader.setMat4("projection", projection);
+    shader.setMat4("V",           view);
+    shader.setMat4("P",           projection);
+    shader.setVec3("cameraRight", cameraRight);
+    shader.setVec3("cameraUp",    cameraUp);
 
     glDepthMask(GL_FALSE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glBindVertexArray(ptVAO);
-    glDrawArrays(GL_POINTS, 0, (GLsizei)particles.size());
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, (GLsizei)particles.size());
     glBindVertexArray(0);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_TRUE);
@@ -98,5 +120,6 @@ void ParticleSystem::spawnExplosion(const AsteroidExplosion& exp)
 void ParticleSystem::free()
 {
     glDeleteVertexArrays(1, &ptVAO);
+    glDeleteBuffers(1, &ptQuadVBO);
     glDeleteBuffers(1, &ptVBO);
 }

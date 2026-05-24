@@ -29,5 +29,5 @@ private:
     };
 
     std::vector<Particle> particles;
-    GLuint ptVAO = 0, ptVBO = 0;
+    GLuint ptVAO = 0, ptQuadVBO = 0, ptVBO = 0;
 };
