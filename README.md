@@ -128,3 +128,4 @@ See in docs/video.mp4
 - Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.) (see docs/Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.))
 - [Triplanar Mapping](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a)
 - [Motion Blur](https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-27-motion-blur-post-processing-effect)
+- [Generate a random uniform direction](https://gwern.net/doc/statistics/probability/1972-marsaglia.pdf)
