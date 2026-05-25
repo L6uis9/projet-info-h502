@@ -47,6 +47,10 @@ static const float SHIP_INVINCIBILITY = 2.0f;
 static const float SHIP_ACCEL = 50.f;
 static const float SHIP_DRAG  = 1.f;
 
+// Camera follow settings
+static const float CAM_FOLLOW_DIST   = 8.f;
+static const float CAM_FOLLOW_HEIGHT = 1.5f;
+
 // Ship hit burst particle settings
 static const int   HIT_BURST_COUNT   = 50;
 static const float HIT_SPAWN_RADIUS_MIN = 0.2f;
@@ -132,9 +136,8 @@ static void processInput(GLFWwindow* win)
 
     lookBack = (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS);
 
-    float dist = 8.f;
     float side  = lookBack ? 1.f : -1.f;
-    camera.position = shipPos + fwd * dist * side + glm::vec3(0.f, 1.5f, 0.f);
+    camera.position = shipPos + fwd * CAM_FOLLOW_DIST * side + glm::vec3(0.f, CAM_FOLLOW_HEIGHT, 0.f);
 }
 
 int main()
