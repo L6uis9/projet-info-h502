@@ -27,16 +27,16 @@ cmake --build .
 
 ## Running
 
+## Running
+
 **Linux / macOS:**
 ```bash
-cd build
-./SpaceGame
+./build/SpaceGame
 ```
 
 **Windows:**
 ```powershell
-cd build
-.\SpaceGame.exe
+.\build\Debug\SpaceGame.exe
 ```
 
 ## Controls
