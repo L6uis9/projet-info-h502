@@ -56,8 +56,8 @@ void PostProcess::apply(Shader& shader, float blurStrength)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, w_, h_);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);  // full-screen quad needs no depth testing
+    glDisable(GL_BLEND);       // avoid blending the quad with itself
 
     shader.use();
     shader.setInt  ("screenTexture", 0);

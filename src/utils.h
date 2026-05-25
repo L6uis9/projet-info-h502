@@ -10,6 +10,7 @@ inline float randF(float lo, float hi)
     return lo + (float)rand() / RAND_MAX * (hi - lo);
 }
 
+// Uniform random direction on the unit sphere (Marsaglia cylindrical method).
 inline glm::vec3 randUnitVec()
 {
     float u     = randF(-1.f, 1.f);

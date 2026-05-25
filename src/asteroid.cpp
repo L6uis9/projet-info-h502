@@ -9,7 +9,7 @@
 #include <cstdlib>
 #include <vector>
 
-// Perlin gradient noise over R³  — introduced in "Texturing and Modeling", Ch.12, (p.344-347) needed for ridged multifractal in Ch.16
+// Perlin gradient noise over R³ introduced in "Texturing and Modeling", Ch.12, (p.344-347) needed for ridged multifractal in Ch.16
 
 // Macros
 
@@ -39,7 +39,7 @@ static float grad[B + B + 2][3];
 static bool  noiseReady = false;
 
 // init() of the book
-
+// Initialises the permutation table and random gradient vectors.
 static void noiseInit()
 {
     noiseReady = true;
@@ -76,7 +76,7 @@ static void noiseInit()
 }
 
 // noise3() of the book
-
+// Evaluates 3-D Perlin gradient noise at point vec[].
 static float noise3(float vec[3])
 {
     if (!noiseReady) noiseInit();
@@ -132,7 +132,8 @@ static float noise3(glm::vec3 p)
 
 // Ridged Multifractal - Chapter 16 of the book, PROCEDURAL FRACTAL TERRAINS, p. 504-505
 // Recommended parameters : H=1.0, lacunarity=2.0, offset=1.0, gain=2.0
-
+// sums octaves of |noise| inverted and squared to produce sharp ridges. 
+// Each octave is weighted by the previous signal to suppress detail in valleys.
 static float ridgedMultifractal(glm::vec3 p,
                                 float H, float lacunarity, int octaves,
                                 float offset, float gain)

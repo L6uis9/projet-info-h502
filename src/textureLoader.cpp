@@ -1,6 +1,5 @@
 #include "textureLoader.h"
 
-// stb_image – define the implementation in exactly one .cpp
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 

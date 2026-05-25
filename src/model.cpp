@@ -60,13 +60,14 @@ void Mesh::free()
 
 // MTL
 
+// Parses an MTL file and returns a map of material name to Material struct.
 static std::unordered_map<std::string, Material>
 parseMTL(const std::string& mtlPath, const std::string& texDir)
 {
     std::unordered_map<std::string, Material> mats;
     std::ifstream f(mtlPath);
     if (!f.is_open()) {
-        std::cerr << "[Model] WARNING – cannot open MTL: " << mtlPath << "\n";
+        std::cerr << "[Model] WARNING - cannot open MTL: " << mtlPath << "\n";
         return mats;
     }
 
@@ -96,7 +97,7 @@ parseMTL(const std::string& mtlPath, const std::string& texDir)
             std::getline(ss, rawPath);
             size_t start = rawPath.find_first_not_of(" \t");
             if (start != std::string::npos) rawPath = rawPath.substr(start);
-            // Normalize Windows backslashes
+            // OBJ files exported on Windows use backslashes
             for (char& c : rawPath) if (c == '\\') c = '/';
             std::string filename = fs::path(rawPath).filename().string();
             std::string fullPath = texDir + "/" + filename;
@@ -136,6 +137,8 @@ void Model::load(const std::string& objPath, const std::string& texDir)
         Mesh mesh;
         mesh.material = currentMat;
 
+        // OBJ allows the same position with different normals/UVs, so we key on the 
+        // full p/t/n triple rather than position alone to avoid collapsing distinct vertices.
         std::unordered_map<std::string, uint32_t> cache;
 
         for (auto& fv : faceVerts) {

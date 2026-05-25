@@ -13,9 +13,12 @@ struct StarEntry {
 
 class Star {
 public:
+    // Allocates the billboard quad geometry on the GPU.
     void init();
+    // Renders each star as a camera-facing billboard positioned at infinity.
     void draw(Shader& shader, const glm::mat4& view, const glm::mat4& projection,
               const std::vector<StarEntry>& suns) const;
+    // Releases GPU resources.
     void free();
 
 private:

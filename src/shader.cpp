@@ -9,7 +9,7 @@ std::string Shader::readFile(const std::string& path)
 {
     std::ifstream f(path);
     if (!f.is_open())
-        throw std::runtime_error("Shader::readFile – cannot open: " + path);
+        throw std::runtime_error("Shader::readFile - cannot open: " + path);
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();

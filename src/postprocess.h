@@ -4,9 +4,11 @@
 
 class PostProcess {
 public:
+    // Creates the FBO (color texture + depth renderbuffer) and the full-screen quad geometry.
     void init(int w, int h);
-    void begin();
-    void apply(Shader& shader, float blurStrength);
+    void begin();                                     // bind FBO call before drawing the scene
+    void apply(Shader& shader, float blurStrength);   // transfer FBO to screen with post-processing
+    // Releases GPU resources.
     void free();
 
 private:

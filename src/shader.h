@@ -9,8 +9,10 @@ public:
     GLuint ID = 0;
 
     Shader() = default;
+    // Compiles both shader stages, links them into a program.
     Shader(const std::string& vertPath, const std::string& fragPath);
 
+    // Binds this program.
     void use() const;
 
     // Uniform setters
@@ -21,6 +23,8 @@ public:
     void setMat4 (const std::string& name, const glm::mat4& v) const;
 
 private:
+    // Compiles a single GLSL stage.
     static GLuint compile(GLenum type, const std::string& src);
+    // Reads a text file into a string.
     static std::string readFile(const std::string& path);
 };

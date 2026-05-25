@@ -15,8 +15,8 @@ struct Material {
     glm::vec3   Kd  = {0.8f, 0.8f, 0.8f};
     GLuint      diffuseTexture = 0;
     bool        hasDiffuse     = false;
-    bool        refractive     = false; // Added to determine if the material is refractive based on the dissolve factor in the MTL file
-    float       Ni             = 1.0f; // Added to store the refractive index of the material, which is read from the MTL file. This will be used in the shader to calculate refraction.
+    bool        refractive     = false;  // true when MTL dissolve (d) < 1
+    float       Ni             = 1.0f;   // index of refraction from MTL "Ni" field
 };
 
 struct Mesh {
@@ -26,8 +26,11 @@ struct Mesh {
 
     GLuint VAO = 0, VBO = 0, EBO = 0;
 
+    // Uploads vertex and index data to GPU (VBO + EBO). Call once after filling vertices/indices.
     void upload();
+    // Issues a glDrawElements call for this mesh.
     void draw() const;
+    // Releases GPU buffers.
     void free();
 };
 

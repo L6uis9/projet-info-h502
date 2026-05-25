@@ -51,7 +51,9 @@ public:
     std::vector<AsteroidInstance> instances;
     float                         nextSpawnTime = 0.f;
 
+    // Pre-generates the mesh pool and binds the shared asteroid texture.
     void init(const AsteroidSpawnCfg& cfg, GLuint texture);
+    // Spawns one asteroid if the spawn timer has elapsed and the cap is not reached.
     void trySpawn(float currentFrame, glm::vec3 shipPos);
 
     // Moves instances, despawns distant ones, resolves asteroid-asteroid collisions.
@@ -64,7 +66,9 @@ public:
                             float invincibilityDur,
                             std::vector<AsteroidExplosion>& out);
 
+    // Renders all active instances.
     void draw(Shader& shader, float currentFrame) const;
+    // Releases GPU resources for every mesh in the pool.
     void free();
 
 private:

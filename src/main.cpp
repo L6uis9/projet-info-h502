@@ -93,14 +93,16 @@ static bool       shipReflective = false;
 
 // GLFW callbacks
 
+// Keeps the OpenGL viewport in sync with the window when the user resizes it.
 static void framebuffer_size_cb(GLFWwindow*, int w, int h)
 {
     glViewport(0, 0, w, h);
 }
 
+// Converts raw cursor position to a delta and forwards it to the camera.
 static void cursor_pos_cb(GLFWwindow*, double xpos, double ypos)
 {
-    if (firstMouse) {
+    if (firstMouse) { // prevent large jump on first frame
         lastX = (float)xpos;
         lastY = (float)ypos;
         firstMouse = false;
@@ -112,6 +114,7 @@ static void cursor_pos_cb(GLFWwindow*, double xpos, double ypos)
     camera.processMouse(xOff, yOff);
 }
 
+// Adjusts the camera field of view for zoom.
 static void scroll_cb(GLFWwindow*, double, double yoffset)
 {
     camera.fov -= (float)yoffset;
@@ -119,6 +122,7 @@ static void scroll_cb(GLFWwindow*, double, double yoffset)
     if (camera.fov > 90.f) camera.fov = 90.f;
 }
 
+// Handles key events: Escape closes the window, X toggles ship reflection.
 static void key_cb(GLFWwindow* win, int key, int, int action, int)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -127,7 +131,8 @@ static void key_cb(GLFWwindow* win, int key, int, int action, int)
         shipReflective = !shipReflective;
 }
 
-// Continuous key handling – updates ship velocity, then snaps camera behind it
+// Handles held keys each frame: W/Z thrusts the ship forward, S looks backward
+// and applies velocity drag to the ship and the camera following it.
 static void processInput(GLFWwindow* win)
 {
     glm::vec3 fwd = camera.front;

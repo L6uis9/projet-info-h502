@@ -1,7 +1,7 @@
-# Space Shooter 3D — INFO-H-502
+# SpaceGame - INFO-H-502
 
 A 3D space shooter in OpenGL where the player must avoid asteroids in space.  
-Project made for the course **INFO-H-502 – 3D Graphics** (ULB, 2025-2026).
+Project made for the course **INFO-H-502 - 3D Graphics** (ULB, 2025-2026).
 
 ## Author
 
