@@ -107,6 +107,7 @@ projet-info-h502/
 │   └── star.{vert,frag}
 ├── docs/
 │   └── Guidelines_project.pdf
+│   └── Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.)
 └── CMakeLists.txt
 ```
 
@@ -123,4 +124,6 @@ projet-info-h502/
 - [Asteroid texture](https://www.magnific.com/free-photo/photo-stone-texture-pattern_414764463.htm#fromView=keyword&page=1&position=0&uuid=52f9083a-e0f6-40a0-8ed2-776861b7fdff&query=Asteroid+texture)
 - [Earth object and texture](https://free3d.com/3d-model/earth-photorealistic-2k-927613.html)
 - [Spaceship object and texture](https://free3d.com/3d-model/e-45-aircraft-71823.html)
-- Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.)
+- Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.) (see docs/Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.))
+- [Triplanar Mapping](https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a)
+- [Motion Blur](https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-27-motion-blur-post-processing-effect)
