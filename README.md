@@ -109,6 +109,7 @@ projet-info-h502/
 │   └── Guidelines_project.pdf
 │   └── Texturing And Modeling. A Procedural Approach (David S. Ebert, F. Kenton Musgrave etc.)
 │   └── video.mp4
+│   └── report.pdf
 └── CMakeLists.txt
 ```
 
