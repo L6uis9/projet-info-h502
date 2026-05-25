@@ -43,13 +43,13 @@ static bool  noiseReady = false;
 static void noiseInit()
 {
     noiseReady = true;
-    srandom(1);
+    srand(1);
 
     for (int i = 0; i < B; i++) {
         float v[3], s;
         do {
             for (int j = 0; j < 3; j++)
-                v[j] = (float)((random() % (B + B)) - B) / (float)B;
+                v[j] = (float)((rand() % (B + B)) - B) / (float)B;
             s = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
         } while (s > 1.f);
         s = std::sqrt(s);
@@ -62,7 +62,7 @@ static void noiseInit()
         perm[i] = i;
     for (int i = B; i > 0; i -= 2) {
         int k   = perm[i];
-        int j   = (int)(random() % B);
+        int j   = (int)(rand() % B);
         perm[i] = perm[j];
         perm[j] = k;
     }
