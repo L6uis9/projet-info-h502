@@ -51,6 +51,9 @@ static const float SHIP_DRAG  = 1.f;
 static const float CAM_FOLLOW_DIST   = 8.f;
 static const float CAM_FOLLOW_HEIGHT = 1.5f;
 
+// Motion blur settings
+static const float BLUR_MAX_STRENGTH = 0.08f;
+
 // Ship hit burst particle settings
 static const int   HIT_BURST_COUNT   = 50;
 static const float HIT_SPAWN_RADIUS_MIN = 0.2f;
@@ -414,7 +417,7 @@ int main()
         // Draw sun at infinity using a billboard (always faces camera)
         sunBillboard.draw(starShader, view, projection, visualStars);
 
-        float blurStrength = glm::clamp(glm::length(shipVelocity) / 100.f, 0.f, 1.f) * 0.08f;
+        float blurStrength = glm::clamp(glm::length(shipVelocity) / 100.f, 0.f, 1.f) * BLUR_MAX_STRENGTH;
         postProcess.apply(motionBlurShader, blurStrength);
 
         glfwSwapBuffers(window);
